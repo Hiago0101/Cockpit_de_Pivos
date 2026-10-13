@@ -188,3 +188,25 @@ class SecurityAndIntegrationTestCase(TestCase):
         indicadores = response.json()["indicadores"]
         self.assertIn("total_pivos", indicadores)
         self.assertGreaterEqual(indicadores["total_pivos"], 1)
+
+    def test_cannot_delete_fazenda_with_linked_talhoes(self):
+        """Impede a exclusão de fazenda que possui talhões vinculados."""
+        from apps.pivots.models import Talhao
+        nova_fazenda = Fazenda.objects.create(
+            nome="Fazenda com Talhão",
+            filial="999001",
+        )
+        Talhao.objects.create(
+            fazenda=nova_fazenda,
+            codigo="TAL-BLOQUEIO",
+            descricao="Talhão de teste bloqueio",
+        )
+
+        # Tentativa de exclusão via API deve retornar 400 Bad Request
+        res = self.admin_client.delete(f"/api/v1/pivots/fazendas/{nova_fazenda.id}/")
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("talhão(ões) vinculado(s)", res.json().get("detail", ""))
+
+        # Fazenda e talhão devem continuar existindo no banco
+        self.assertTrue(Fazenda.objects.filter(id=nova_fazenda.id).exists())
+        self.assertTrue(Talhao.objects.filter(fazenda=nova_fazenda).exists())

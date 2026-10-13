@@ -144,9 +144,9 @@ class Command(BaseCommand):
             pivos_criados.append(pivo_obj)
 
         # 5. Culturas e Safra
-        soja, _ = Cultura.objects.get_or_create(nome="Soja", defaults={"variedade": "TMG 7062 IPRO", "dias_ciclo_estimado": 115, "coeficiente_kc_padrao": 1.15})
-        milho, _ = Cultura.objects.get_or_create(nome="Milho", defaults={"variedade": "P3707 VYHR", "dias_ciclo_estimado": 135, "coeficiente_kc_padrao": 1.20})
-        feijao, _ = Cultura.objects.get_or_create(nome="Feijão", defaults={"variedade": "BRS Estilo", "dias_ciclo_estimado": 85, "coeficiente_kc_padrao": 1.05})
+        soja, _ = Cultura.objects.get_or_create(descricao="SOJA", defaults={"id_pims": "PIMS-SOJA"})
+        milho, _ = Cultura.objects.get_or_create(descricao="MILHO", defaults={"id_pims": "PIMS-MILHO"})
+        feijao, _ = Cultura.objects.get_or_create(descricao="FEIJÃO", defaults={"id_pims": "PIMS-FEIJAO"})
 
         safra, _ = Safra.objects.get_or_create(
             nome="Safra 2024/2025 - Verão",

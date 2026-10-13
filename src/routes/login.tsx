@@ -7,13 +7,12 @@ import {
   EyeOff,
   Loader2,
   AlertCircle,
-  ShieldCheck,
-  Building2,
+  ArrowRight,
+  LockKeyhole,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { BrandIcon } from "@/config/navigation";
 import loginFields from "@/assets/login-fields.jpg";
 import { api } from "@/services/api";
@@ -46,19 +45,18 @@ function LoginPage() {
 
     const cleanUsername = username.trim();
     if (!cleanUsername) {
-      setErrorMessage("Por favor, informe seu usuário ou e-mail de acesso.");
+      setErrorMessage("Por favor, informe seu usuário de acesso.");
       return;
     }
     if (!password) {
-      setErrorMessage("Por favor, digite sua senha de acesso.");
+      setErrorMessage("Por favor, digite sua senha.");
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const response = await api.login(cleanUsername, password);
-      // Login validado pelo backend Django REST Framework
+      await api.login(cleanUsername, password);
       if (typeof window !== "undefined") {
         localStorage.setItem("cockpit_authenticated", "true");
       }
@@ -66,7 +64,7 @@ function LoginPage() {
     } catch (error: any) {
       const message =
         error?.message ||
-        "Não foi possível autenticar. Verifique suas credenciais e conexão com o servidor.";
+        "Não foi possível autenticar. Verifique seu usuário e senha.";
       setErrorMessage(message);
     } finally {
       setIsLoading(false);
@@ -74,10 +72,10 @@ function LoginPage() {
   };
 
   return (
-    <main className="grid min-h-svh bg-background lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-      {/* Lado Visual Corporativo / Agrícola */}
+    <main className="grid min-h-svh bg-background lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+      {/* Banner Visual Superior (Mobile) e Lateral (Desktop) */}
       <section
-        className="relative hidden overflow-hidden bg-sidebar lg:block"
+        className="relative h-[34svh] min-h-60 max-h-[380px] overflow-hidden bg-sidebar lg:h-auto lg:min-h-svh lg:max-h-none"
         aria-label="Área agrícola irrigada por pivô central"
       >
         <img
@@ -87,167 +85,176 @@ function LoginPage() {
           alt="Vista aérea de lavouras verdes com irrigação por pivô central"
           className="absolute inset-0 h-full w-full object-cover"
         />
-        <div className="absolute inset-0 bg-sidebar/55" />
-        <div className="relative flex h-full min-h-svh flex-col justify-between p-12 text-sidebar-foreground">
+        <div className="absolute inset-0 bg-sidebar/35 lg:bg-sidebar/45 backdrop-blur-[0.5px]" />
+        <div className="relative flex h-full flex-col justify-between gap-6 px-6 pb-10 pt-[max(1.25rem,env(safe-area-inset-top))] text-sidebar-foreground sm:px-12 lg:min-h-svh lg:p-12">
           <div className="flex items-center gap-3">
-            <span className="grid size-11 place-items-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground shadow-sm">
-              <BrandIcon className="size-6" />
+            <span className="grid size-10 place-items-center rounded-md bg-sidebar-primary text-sidebar-primary-foreground shadow-sm lg:size-11">
+              <BrandIcon className="size-5.5 lg:size-6" />
             </span>
             <div className="leading-tight">
-              <span className="block text-sm font-semibold tracking-wide">COCKPIT DE PIVÔS</span>
-              <span className="block text-xs text-sidebar-foreground/75">Controle de Irrigação & Operações</span>
+              <span className="block text-xs font-semibold uppercase tracking-wider lg:text-sm">Gestão agrícola</span>
+              <span className="block text-[11px] text-sidebar-foreground/75">Cockpit de Pivôs</span>
             </div>
           </div>
 
-          <div className="max-w-lg pb-10">
-            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-sidebar-foreground/20 bg-sidebar/60 px-3.5 py-1 text-xs font-medium uppercase tracking-wider backdrop-blur-sm text-sidebar-foreground/90">
-              <ShieldCheck className="size-3.5 text-primary" />
-              Acesso Seguro e Auditado
-            </div>
-            <h1 className="text-4xl font-bold leading-tight tracking-tight sm:text-5xl">
-              Gestão Inteligente de Pivôs Centrais
+          <div className="max-w-md pb-2 lg:pb-8">
+            <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-sidebar-foreground/90 lg:mb-4 lg:text-xs">
+              Planejamento · Irrigação · Operação
+            </p>
+            <h1 className="max-w-64 text-3xl font-semibold leading-tight sm:max-w-none sm:text-4xl lg:text-5xl">
+              Cockpit de Pivôs
             </h1>
-            <p className="mt-4 max-w-md text-base leading-relaxed text-sidebar-foreground/85">
-              Monitoramento em tempo real, controle de pressão e lâmina, gestão de janelas tarifárias e sincronização contínua entre campo e escritório.
+            <p className="mt-4 hidden max-w-sm text-sm leading-relaxed text-sidebar-foreground/90 lg:block lg:text-base">
+              Uma visão integrada do campo, do planejamento à operação.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Formulário de Autenticação */}
-      <section className="flex min-h-svh min-w-0 flex-col justify-between px-6 py-8 sm:px-12 sm:py-12">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="grid size-9 place-items-center rounded-md bg-primary/10 text-primary">
-              <BrandIcon className="size-5" />
-            </span>
-            <span className="text-sm font-bold tracking-tight text-foreground uppercase">Cockpit</span>
-          </div>
-          <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-            <Building2 className="size-3.5 text-muted-foreground" />
-            Ambiente Local Integrado
+      {/* Card do Formulário (Com curva arredondada de sobreposição no mobile) */}
+      <section className="relative -mt-6 flex min-h-[calc(66svh+1.5rem)] min-w-0 flex-col rounded-t-3xl bg-background px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-8 shadow-2xl sm:px-12 lg:mt-0 lg:min-h-svh lg:rounded-none lg:shadow-none lg:py-10">
+        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-start pb-8 pt-1 lg:justify-center lg:py-12">
+          <span className="mb-6 hidden size-12 place-items-center rounded-md bg-accent text-primary lg:grid">
+            <BrandIcon className="size-7" />
           </span>
-        </div>
-
-        <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-center py-8">
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              Acesso ao Sistema
-            </h2>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Insira suas credenciais de usuário para acessar suas fazendas e equipamentos.
-            </p>
+          <p className="mb-2 hidden text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:block">
+            Cockpit de Pivôs
+          </p>
+          <div className="mb-3 flex items-center gap-2 text-xs font-medium text-primary lg:hidden">
+            <span className="h-px w-6 bg-primary" />
+            Acesso ao Sistema
           </div>
+          <h2 className="text-2xl font-semibold leading-tight text-foreground sm:text-3xl">
+            Bem-vindo de volta
+          </h2>
+          <p className="mt-2 text-xs leading-relaxed text-muted-foreground sm:text-sm">
+            Acesse com seu usuário e senha corporativos.
+          </p>
 
+          {/* Alerta de Erro com Ícone Centralizado */}
           {errorMessage && (
-            <Alert variant="destructive" className="mb-6 border-destructive/30 bg-destructive/10 text-destructive">
-              <AlertCircle className="size-4" />
-              <AlertDescription className="text-xs font-medium leading-relaxed">
+            <div className="mt-5 flex items-center gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-3 text-xs text-destructive">
+              <AlertCircle className="size-4 shrink-0" />
+              <span className="font-medium leading-normal break-words">
                 {errorMessage}
-              </AlertDescription>
-            </Alert>
+              </span>
+            </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div className="space-y-2">
-              <Label htmlFor="username" className="text-xs font-medium text-foreground">
+          {/* Formulário de Login */}
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
+            {/* Campo Usuário */}
+            <div className="space-y-1.5">
+              <Label htmlFor="login-username" className="text-xs font-medium text-foreground">
                 Usuário ou E-mail
               </Label>
               <div className="relative">
-                <User className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <User className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  id="username"
-                  name="username"
+                  id="login-username"
                   type="text"
-                  autoComplete="username"
                   required
+                  autoComplete="username"
+                  autoCapitalize="none"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Seu usuário ou e-mail"
-                  className="pl-9 h-11 text-sm bg-background border-input focus-visible:ring-primary"
+                  placeholder="Seu usuário de acesso"
+                  className="h-11 pl-10 text-sm bg-background"
                   disabled={isLoading}
                 />
               </div>
             </div>
 
-            <div className="space-y-2">
+            {/* Campo Senha */}
+            <div className="space-y-1.5">
               <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-xs font-medium text-foreground">
+                <Label htmlFor="login-password" className="text-xs font-medium text-foreground">
                   Senha
                 </Label>
               </div>
               <div className="relative">
-                <Lock className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Lock className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                 <Input
-                  id="password"
-                  name="password"
+                  id="login-password"
                   type={showPassword ? "text" : "password"}
-                  autoComplete="current-password"
                   required
+                  autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="pl-9 pr-10 h-11 text-sm bg-background border-input focus-visible:ring-primary"
+                  placeholder="Sua senha"
+                  className="h-11 pl-10 pr-10 text-sm bg-background font-mono"
                   disabled={isLoading}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground focus:outline-none"
-                  aria-label={showPassword ? "Ocultar senha" : "Exibir senha"}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  title={showPassword ? "Ocultar senha" : "Exibir senha"}
+                  tabIndex={-1}
                 >
                   {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
                 </button>
               </div>
             </div>
 
+            {/* Botão de Entrar */}
             <Button
               type="submit"
-              size="lg"
               disabled={isLoading}
-              className="w-full h-11 text-sm font-semibold transition-all shadow-sm cursor-pointer"
+              className="mt-2 h-11 w-full justify-center gap-2 font-semibold text-sm cursor-pointer shadow-sm"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  <Loader2 className="size-4 animate-spin" />
                   Autenticando...
                 </>
               ) : (
-                "Entrar no Cockpit"
+                <>
+                  Entrar no Cockpit
+                  <ArrowRight className="size-4" />
+                </>
               )}
             </Button>
           </form>
 
-          {/* Opção secundária: SSO Corporativo Microsoft */}
-          <div className="mt-8 border-t border-border pt-6">
-            <p className="text-center text-xs font-medium text-muted-foreground mb-3">
-              Conta Corporativa SSO
-            </p>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isLoading}
-              onClick={() => {
-                setErrorMessage(
-                  "A autenticação via Microsoft Entra ID (SSO) está reservada para o ambiente corporativo com tenant homologado. Utilize suas credenciais locais para desenvolvimento e testes."
-                );
-              }}
-              className="w-full h-10 justify-center gap-2.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
-            >
-              <span className="microsoft-mark grid size-3.5 shrink-0 grid-cols-2 gap-0.5" aria-hidden="true">
-                <span className="bg-[#f25022]" />
-                <span className="bg-[#7fba00]" />
-                <span className="bg-[#00a4ef]" />
-                <span className="bg-[#ffb900]" />
-              </span>
-              <span>Entrar com Microsoft 365 (SSO)</span>
-            </Button>
+          {/* Divisor Corporativo */}
+          <div className="relative my-6 flex items-center justify-center text-xs text-muted-foreground">
+            <span className="absolute inset-x-0 h-px bg-border/70" />
+            <span className="relative bg-background px-2.5 uppercase tracking-wider text-[10px] font-medium text-muted-foreground">
+              ou acesso institucional
+            </span>
+          </div>
+
+          {/* Botão Microsoft 365 (Fiel ao design original) */}
+          <Button
+            type="button"
+            variant="outline"
+            className="h-11 w-full justify-center gap-2.5 border-input hover:bg-accent text-xs font-medium cursor-pointer"
+            title="Autenticação integrada com conta corporativa Microsoft 365"
+            onClick={() => {
+              setErrorMessage("O Single Sign-On Microsoft 365 corporativo será ativado na homologação. Utilize seu usuário e senha acima.");
+            }}
+          >
+            <span className="microsoft-mark grid size-3.5 grid-cols-2 gap-0.5" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <span />
+            </span>
+            <span>Entrar com Microsoft 365</span>
+          </Button>
+
+          {/* Informações de Segurança */}
+          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground lg:justify-start">
+            <LockKeyhole className="size-3.5 text-primary" />
+            <span>Acesso seguro com permissões RBAC</span>
           </div>
         </div>
 
-        <footer className="text-center text-xs text-muted-foreground border-t border-border/60 pt-4">
-          <p>© {new Date().getFullYear()} Cockpit de Pivôs — Todos os acessos são registrados e auditados.</p>
+        {/* Rodapé */}
+        <footer className="mt-auto flex items-center justify-center gap-2 pt-4 text-[11px] text-muted-foreground lg:text-xs">
+          <BrandIcon className="size-3.5 text-primary lg:hidden" />
+          <span>Cockpit de Pivôs — Grupo Farroupilha</span>
         </footer>
       </section>
     </main>

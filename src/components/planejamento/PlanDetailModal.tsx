@@ -138,21 +138,35 @@ export function PlanDetailModal({
 
               <div className="rounded-xl border border-border bg-card p-3 shadow-sm">
                 <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Data de Plantio
+                  Plantio (Prev. · Real)
                 </span>
-                <p className="mt-1 text-sm font-semibold text-foreground flex items-center gap-1">
+                <p className="mt-1 text-xs font-semibold text-foreground flex items-center gap-1">
                   <Calendar className="size-3.5 text-primary shrink-0" />
-                  {plan.data_plantio ? new Date(plan.data_plantio + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
+                  <span>Prev: {plan.data_plantio ? new Date(plan.data_plantio + "T00:00:00").toLocaleDateString("pt-BR") : "—"}</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Real: {plan.data_plantio_real ? (
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      {new Date(plan.data_plantio_real + "T00:00:00").toLocaleDateString("pt-BR")}
+                    </span>
+                  ) : "Não realizado"}
                 </p>
               </div>
 
               <div className="rounded-xl border border-border bg-card p-3 shadow-sm">
                 <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">
-                  Colheita Prevista
+                  Colheita (Prev. · Real)
                 </span>
-                <p className="mt-1 text-sm font-semibold text-foreground flex items-center gap-1">
+                <p className="mt-1 text-xs font-semibold text-foreground flex items-center gap-1">
                   <Calendar className="size-3.5 text-amber-500 shrink-0" />
-                  {plan.data_colheita_prevista ? new Date(plan.data_colheita_prevista + "T00:00:00").toLocaleDateString("pt-BR") : "—"}
+                  <span>Prev: {plan.data_colheita_prevista ? new Date(plan.data_colheita_prevista + "T00:00:00").toLocaleDateString("pt-BR") : "—"}</span>
+                </p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">
+                  Real: {plan.data_colheita_real ? (
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                      {new Date(plan.data_colheita_real + "T00:00:00").toLocaleDateString("pt-BR")}
+                    </span>
+                  ) : "Não realizada"}
                 </p>
               </div>
 
@@ -166,6 +180,26 @@ export function PlanDetailModal({
                 </p>
               </div>
             </div>
+
+            {/* Aviso de Sobreposição Autorizada */}
+            {plan.permite_sobreposicao && (
+              <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/20 dark:border-amber-900/50 p-3 space-y-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-amber-800 dark:text-amber-400">
+                  <Shield className="size-3.5" />
+                  Sobreposição de Datas Autorizada
+                </div>
+                {plan.autorizado_por_nome && (
+                  <p className="text-[11px] text-amber-700 dark:text-amber-300">
+                    Autorizado por: <span className="font-semibold">{plan.autorizado_por_nome}</span>
+                  </p>
+                )}
+                {plan.justificativa_sobreposicao && (
+                  <p className="text-[11px] text-amber-600 dark:text-amber-400 italic">
+                    "{plan.justificativa_sobreposicao}"
+                  </p>
+                )}
+              </div>
+            )}
 
             {/* Alocação Física e Equipamentos */}
             <div className="rounded-xl border border-border bg-muted/30 p-3.5 space-y-2.5">

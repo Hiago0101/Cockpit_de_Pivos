@@ -114,6 +114,216 @@ def executar_transicao_status(
 
 
 # ==============================================================================
+# REGRAS DE VALIDAÇÃO DE SOBREPOSIÇÃO E CÁLCULO DE PERÍODOS LIVRES (GANTT)
+# ==============================================================================
+
+def validar_sobreposicao_plano(attrs: dict, instance=None, user=None) -> None:
+    """
+    Identifica se dois planejamentos da mesma unidade de área possuem períodos sobrepostos.
+    Bloqueia gravação normal exceto se expressamente autorizado com justificativa auditável.
+    """
+    from .models import PlanoOperacional
+
+    data_plantio = attrs.get("data_plantio") if "data_plantio" in attrs else (instance.data_plantio if instance else None)
+    data_colheita_prevista = attrs.get("data_colheita_prevista") if "data_colheita_prevista" in attrs else (instance.data_colheita_prevista if instance else None)
+    data_plantio_real = attrs.get("data_plantio_real") if "data_plantio_real" in attrs else (instance.data_plantio_real if instance else None)
+    data_colheita_real = attrs.get("data_colheita_real") if "data_colheita_real" in attrs else (instance.data_colheita_real if instance else None)
+
+    cand_start = data_plantio_real or data_plantio
+    cand_end = data_colheita_real or data_colheita_prevista
+
+    if not cand_start or not cand_end:
+        return
+
+    pivo = attrs.get("pivo") if "pivo" in attrs else (instance.pivo if instance else None)
+    talhao = attrs.get("talhao") if "talhao" in attrs else (instance.talhao if instance else None)
+
+    if not pivo:
+        # Se não há pivô associado (apenas talhão ou área geral),
+        # diferentes parcelas de cultivo podem coexistir simultaneamente no talhão
+        return
+
+    qs = PlanoOperacional.objects.exclude(status="CANCELADO").filter(pivo=pivo)
+
+    if instance and instance.pk:
+        qs = qs.exclude(pk=instance.pk)
+
+    for outro in qs.select_related("cultura", "pivo", "talhao", "safra"):
+        outro_start = outro.data_plantio_real or outro.data_plantio
+        outro_end = outro.data_colheita_real or outro.data_colheita_prevista
+
+        # Verificação exata de interseção entre os intervalos [cand_start, cand_end] e [outro_start, outro_end]
+        if cand_start < outro_end and cand_end > outro_start:
+            permite = attrs.get("permite_sobreposicao", getattr(instance, "permite_sobreposicao", False))
+            justificativa = attrs.get("justificativa_sobreposicao", getattr(instance, "justificativa_sobreposicao", ""))
+
+            alvo_codigo = outro.pivo.codigo if outro.pivo else (outro.talhao.codigo if outro.talhao else "unidade")
+            alvo_tipo = "pivô" if outro.pivo else "talhão"
+
+            if not permite:
+                raise ValidationError({
+                    "conflito_sobreposicao": (
+                        f"Conflito de datas no {alvo_tipo} {alvo_codigo}: o período solicitado ({cand_start.strftime('%d/%m/%Y')} a {cand_end.strftime('%d/%m/%Y')}) "
+                        f"sobrepõe o cultivo de '{outro.cultura.nome}' ({outro_start.strftime('%d/%m/%Y')} a {outro_end.strftime('%d/%m/%Y')}). "
+                        "Para prosseguir, corrija as datas ou confirme a autorização de sobreposição com justificativa auditável."
+                    )
+                })
+            else:
+                if not justificativa or not str(justificativa).strip():
+                    raise ValidationError({
+                        "justificativa_sobreposicao": "A autorização de sobreposição de ciclos exige o preenchimento de uma justificativa auditável."
+                    })
+                if user and user.is_authenticated:
+                    attrs["autorizado_por"] = user
+
+
+def calcular_cronograma_disponibilidade(qs_planos) -> dict:
+    """
+    Calcula cronograma detalhado de eventos de cultivo, períodos livres e conflitos
+    agrupados por unidade de planejamento (pivô ou talhão), respeitando a precedência
+    de datas reais sobre previstas para disponibilidade operacional.
+    """
+    from collections import defaultdict
+
+    events = []
+    # Planos cancelados não entram na linha de tempo ativa nem no cálculo de disponibilidade
+    planos_ativos = [p for p in qs_planos if p.status != "CANCELADO"]
+
+    # Mapeamento e serialização dos eventos
+    for p in qs_planos:
+        alvo_nome = p.pivo.codigo if p.pivo else (p.talhao.codigo if p.talhao else (p.fazenda.nome if p.fazenda else "Área"))
+        duracao_planejada = (p.data_colheita_prevista - p.data_plantio).days if (p.data_plantio and p.data_colheita_prevista) else 0
+        duracao_real = (p.data_colheita_real - p.data_plantio_real).days if (p.data_plantio_real and p.data_colheita_real) else None
+
+        events.append({
+            "id": str(p.id),
+            "title": f"{p.cultura.nome} · {alvo_nome}",
+            "safra_id": str(p.safra_id),
+            "safra_nome": p.safra.nome,
+            "cultura_id": str(p.cultura_id),
+            "cultura_nome": p.cultura.nome,
+            "fazenda_id": str(p.fazenda_id) if p.fazenda_id else None,
+            "fazenda_nome": p.fazenda.nome if p.fazenda else "",
+            "talhao_id": str(p.talhao_id) if p.talhao_id else None,
+            "talhao_codigo": p.talhao.codigo if p.talhao else "",
+            "pivo_id": str(p.pivo_id) if p.pivo_id else None,
+            "pivo_codigo": p.pivo.codigo if p.pivo else "",
+            "pivo_nome": p.pivo.nome if p.pivo else "",
+            "start": str(p.data_plantio),
+            "end": str(p.data_colheita_prevista),
+            "data_plantio": str(p.data_plantio),
+            "data_colheita_prevista": str(p.data_colheita_prevista),
+            "data_plantio_real": str(p.data_plantio_real) if p.data_plantio_real else None,
+            "data_colheita_real": str(p.data_colheita_real) if p.data_colheita_real else None,
+            "area_planejada_ha": float(p.area_planejada_ha),
+            "duracao_planejada_dias": duracao_planejada,
+            "duracao_real_dias": duracao_real,
+            "status": p.status,
+            "status_display": p.get_status_display(),
+            "permite_sobreposicao": p.permite_sobreposicao,
+            "justificativa_sobreposicao": p.justificativa_sobreposicao,
+            "observacoes": p.observacoes,
+        })
+
+    # Agrupar planos ativos por unidade de planejamento
+    unidades_map = defaultdict(list)
+    for p in planos_ativos:
+        if p.pivo_id:
+            key = f"pivo_{p.pivo_id}"
+        elif p.talhao_id:
+            key = f"talhao_{p.talhao_id}"
+        elif p.fazenda_id:
+            key = f"fazenda_{p.fazenda_id}"
+        else:
+            key = "geral"
+        unidades_map[key].append(p)
+
+    periodos_livres = []
+    conflitos = []
+    sem_planejamento_futuro = []
+
+    for key, lista in unidades_map.items():
+        # Ordenar cronologicamente pela data efetiva/planejada de início do cultivo
+        def get_op_start(plano):
+            return plano.data_plantio_real or plano.data_plantio
+
+        def get_op_end(plano):
+            return plano.data_colheita_real or plano.data_colheita_prevista
+
+        lista_ordenada = sorted(lista, key=get_op_start)
+
+        for i in range(len(lista_ordenada) - 1):
+            p_ant = lista_ordenada[i]
+            p_prox = lista_ordenada[i + 1]
+
+            fim_ant = get_op_end(p_ant)
+            ini_prox = get_op_start(p_prox)
+            delta_dias = (ini_prox - fim_ant).days
+
+            unidade_info = {
+                "pivo_id": str(p_ant.pivo_id) if p_ant.pivo_id else None,
+                "pivo_codigo": p_ant.pivo.codigo if p_ant.pivo else "",
+                "talhao_id": str(p_ant.talhao_id) if p_ant.talhao_id else None,
+                "talhao_codigo": p_ant.talhao.codigo if p_ant.talhao else "",
+                "fazenda_id": str(p_ant.fazenda_id) if p_ant.fazenda_id else None,
+                "fazenda_nome": p_ant.fazenda.nome if p_ant.fazenda else "",
+            }
+
+            if delta_dias > 0:
+                periodos_livres.append({
+                    "id": f"livre-{p_ant.id}-{p_prox.id}",
+                    **unidade_info,
+                    "start": str(fim_ant),
+                    "end": str(ini_prox),
+                    "dias_livres": delta_dias,
+                    "label": f"LIVRE ({delta_dias} dias)",
+                    "tipo": "LIVRE",
+                    "cultura_anterior": p_ant.cultura.nome,
+                    "cultura_proxima": p_prox.cultura.nome,
+                    "plano_anterior_id": str(p_ant.id),
+                    "plano_proximo_id": str(p_prox.id),
+                })
+            elif delta_dias < 0:
+                conflitos.append({
+                    "id": f"conflito-{p_ant.id}-{p_prox.id}",
+                    **unidade_info,
+                    "start": str(ini_prox),
+                    "end": str(fim_ant),
+                    "dias_sobreposicao": abs(delta_dias),
+                    "label": f"CONFLITO ({abs(delta_dias)} dias)",
+                    "tipo": "CONFLITO",
+                    "cultura_anterior": p_ant.cultura.nome,
+                    "cultura_proxima": p_prox.cultura.nome,
+                    "plano_anterior_id": str(p_ant.id),
+                    "plano_proximo_id": str(p_prox.id),
+                    "mensagem": f"Sobreposição de {abs(delta_dias)} dias entre {p_ant.cultura.nome} e {p_prox.cultura.nome}",
+                })
+
+        # Marcador explícito após o último cultivo: "Sem planejamento futuro"
+        if lista_ordenada:
+            ultimo = lista_ordenada[-1]
+            sem_planejamento_futuro.append({
+                "pivo_id": str(ultimo.pivo_id) if ultimo.pivo_id else None,
+                "pivo_codigo": ultimo.pivo.codigo if ultimo.pivo else "",
+                "talhao_id": str(ultimo.talhao_id) if ultimo.talhao_id else None,
+                "talhao_codigo": ultimo.talhao.codigo if ultimo.talhao else "",
+                "fazenda_id": str(ultimo.fazenda_id) if ultimo.fazenda_id else None,
+                "fazenda_nome": ultimo.fazenda.nome if ultimo.fazenda else "",
+                "apos_data": str(get_op_end(ultimo)),
+                "ultima_cultura": ultimo.cultura.nome,
+                "tipo": "SEM_PLANEJAMENTO_FUTURO",
+            })
+
+    return {
+        "events": events,
+        "total": len(events),
+        "periodos_livres": periodos_livres,
+        "conflitos": conflitos,
+        "sem_planejamento_futuro": sem_planejamento_futuro,
+    }
+
+
+# ==============================================================================
 # MÁQUINA DE ESTADOS E REGRAS DE JANELAS DE OPORTUNIDADE
 # ==============================================================================
 

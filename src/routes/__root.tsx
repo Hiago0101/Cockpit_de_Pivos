@@ -14,6 +14,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppShell } from "@/components/app-shell";
+import { Toaster } from "@/components/ui/sonner";
 import { api, getAuthToken } from "@/services/api";
 
 function NotFoundComponent() {
@@ -142,6 +143,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       {isLogin ? <Outlet /> : <AppShell><Outlet /></AppShell>}
+      <Toaster richColors position="top-right" closeButton />
     </QueryClientProvider>
   );
 }

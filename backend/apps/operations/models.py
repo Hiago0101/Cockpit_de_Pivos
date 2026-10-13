@@ -4,26 +4,68 @@ from django.contrib.auth.models import User
 from apps.pivots.models import Pivo, Fazenda, Talhao, Empresa
 
 class Cultura(models.Model):
-    """Culturas agrícolas plantadas nas áreas sob pivôs."""
+    """Culturas agrícolas cadastradas no sistema.
+    Campos estritos:
+      - ID do Sistema (id - UUIDField)
+      - Fazenda / Filial (fazenda - ForeignKey Fazenda)
+      - Talhão (talhao - ForeignKey Talhao, opcional)
+      - Descrição completa da cultura (descricao - maiúsculo)
+      - ID do PIMS (id_pims, opcional, único quando informado)
+    """
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    nome = models.CharField(max_length=100)  # Soja, Milho, Algodão, Feijão
-    codigo = models.CharField(max_length=50, blank=True, default="", help_text="Código interno ou mnemônico")
-    variedade = models.CharField(max_length=100, blank=True, default="")
-    descricao = models.TextField(blank=True, default="")
-    dias_ciclo_estimado = models.PositiveIntegerField(default=120)
-    coeficiente_kc_padrao = models.DecimalField(max_digits=4, decimal_places=2, default=1.15)
-    ativo = models.BooleanField(default=True)
-    observacoes = models.TextField(blank=True, default="")
+    fazenda = models.ForeignKey(
+        Fazenda,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="culturas",
+        help_text="Fazenda / Filial vinculada"
+    )
+    descricao = models.CharField(max_length=255, blank=False, default="", help_text="Descrição completa da cultura")
+    id_pims = models.CharField(max_length=50, blank=True, default="", help_text="Identificador no PIMS (opcional)")
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["nome"]
+        ordering = ["descricao"]
         verbose_name = "Cultura"
         verbose_name_plural = "Culturas"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["id_pims"],
+                name="unique_cultura_id_pims",
+                condition=~models.Q(id_pims=""),
+            ),
+        ]
+
+    @property
+    def nome(self):
+        """Propriedade para compatibilidade com código que acessa cultura.nome."""
+        return self.descricao
+
+    def save(self, *args, **kwargs):
+        # 1. Forçar descrição em maiúsculo
+        if self.descricao:
+            self.descricao = self.descricao.strip().upper()
+
+        # 2. Limpeza e validação de duplicidade do ID PIMS (quando informado)
+        if self.id_pims:
+            self.id_pims = self.id_pims.strip()
+            if self.id_pims:
+                qs_pims = Cultura.objects.filter(id_pims__iexact=self.id_pims)
+                if self.id:
+                    qs_pims = qs_pims.exclude(id=self.id)
+                if qs_pims.exists():
+                    conflito = qs_pims.first()
+                    from django.core.exceptions import ValidationError
+                    raise ValidationError({
+                        "id_pims": f"Já existe uma cultura com o ID PIMS '{self.id_pims}' ({conflito.descricao})."
+                    })
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.nome} ({self.variedade or 'Padrão'})"
+        return self.descricao
 
 class Safra(models.Model):
     """Ano agrícola ou ciclo de safra/safrinha."""
@@ -71,12 +113,17 @@ class PlanoOperacional(models.Model):
     talhao = models.ForeignKey(Talhao, on_delete=models.SET_NULL, null=True, blank=True, related_name="planos")
     pivo = models.ForeignKey(Pivo, on_delete=models.SET_NULL, null=True, blank=True, related_name="planos")
     
-    data_plantio = models.DateField()
-    data_colheita_prevista = models.DateField()
+    data_plantio = models.DateField(help_text="Data prevista do plantio")
+    data_colheita_prevista = models.DateField(help_text="Data prevista da colheita")
+    data_plantio_real = models.DateField(null=True, blank=True, help_text="Data efetiva do plantio")
+    data_colheita_real = models.DateField(null=True, blank=True, help_text="Data efetiva da colheita")
     area_planejada_ha = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     lamina_total_planejada_mm = models.DecimalField(max_digits=7, decimal_places=2, default=450.00)
     lamina_acumulada_realizada_mm = models.DecimalField(max_digits=7, decimal_places=2, default=0.00)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="PLANEJADO")
+    permite_sobreposicao = models.BooleanField(default=False, help_text="Indica se eventual sobreposição de datas foi autorizada")
+    justificativa_sobreposicao = models.TextField(blank=True, default="", help_text="Justificativa auditável para autorização de sobreposição")
+    autorizado_por = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name="planos_autorizados")
     observacoes = models.TextField(blank=True, default="")
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
@@ -85,6 +132,14 @@ class PlanoOperacional(models.Model):
         ordering = ["-data_plantio"]
         verbose_name = "Plano Operacional"
         verbose_name_plural = "Planos Operacionais"
+
+    def save(self, *args, **kwargs):
+        if not self.fazenda:
+            if self.pivo:
+                self.fazenda = self.pivo.fazenda
+            elif self.talhao:
+                self.fazenda = self.talhao.fazenda
+        super().save(*args, **kwargs)
 
     def __str__(self):
         alvo = self.pivo.codigo if self.pivo else (self.talhao.codigo if self.talhao else (self.fazenda.nome if self.fazenda else "Área"))

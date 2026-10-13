@@ -87,21 +87,15 @@ class PlanejamentoAgricolaTestCase(TestCase):
 
         # 3. Culturas e Safras
         self.cultura_soja = Cultura.objects.create(
-            nome="Soja Teste",
-            codigo="SOJ-TEST",
-            variedade="IPRO 7000",
-            dias_ciclo_estimado=115,
-            coeficiente_kc_padrao=Decimal("1.15"),
-            ativo=True
+            descricao="SOJA TESTE",
+            id_pims="PIMS-SOJ-01",
+            fazenda=self.fazenda1,
         )
 
         self.cultura_milho = Cultura.objects.create(
-            nome="Milho Teste",
-            codigo="MIL-TEST",
-            variedade="VT PRO",
-            dias_ciclo_estimado=130,
-            coeficiente_kc_padrao=Decimal("1.20"),
-            ativo=True
+            descricao="MILHO TESTE",
+            id_pims="PIMS-MIL-01",
+            fazenda=self.fazenda1,
         )
 
         self.safra = Safra.objects.create(
@@ -137,12 +131,9 @@ class PlanejamentoAgricolaTestCase(TestCase):
 
         # 1. Criação bem sucedida
         res = self.client.post("/api/v1/operations/culturas/", {
-            "nome": "Feijão Carioca",
-            "codigo": "FEJ-CAR",
-            "variedade": "Pérola",
-            "dias_ciclo_estimado": 90,
-            "coeficiente_kc_padrao": 1.10,
-            "descricao": "Feijão irrigado de inverno"
+            "descricao": "FEIJÃO CARIOCA",
+            "id_pims": "PIMS-FEJ-01",
+            "fazenda": self.fazenda1.id,
         })
         self.assertEqual(res.status_code, status.HTTP_201_CREATED)
         feijao_id = res.data["id"]
@@ -150,21 +141,27 @@ class PlanejamentoAgricolaTestCase(TestCase):
         # 2. Consulta
         res_get = self.client.get(f"/api/v1/operations/culturas/{feijao_id}/")
         self.assertEqual(res_get.status_code, status.HTTP_200_OK)
-        self.assertEqual(res_get.data["codigo"], "FEJ-CAR")
+        self.assertEqual(res_get.data["id"], feijao_id)
+        self.assertEqual(res_get.data["descricao"], "FEIJÃO CARIOCA")
+        self.assertEqual(res_get.data["id_pims"], "PIMS-FEJ-01")
+        self.assertEqual(res_get.data["fazenda"], self.fazenda1.id)
+        self.assertNotIn("talhao", res_get.data)
 
-        # 3. Bloqueio de duplicidade de nome
-        res_dup_nome = self.client.post("/api/v1/operations/culturas/", {
-            "nome": "Feijão Carioca",
-            "codigo": "FEJ-NOVO",
+        # 3. Bloqueio de duplicidade de descrição
+        res_dup_desc = self.client.post("/api/v1/operations/culturas/", {
+            "descricao": "FEIJÃO CARIOCA",
+            "fazenda": self.fazenda1.id,
         })
-        self.assertEqual(res_dup_nome.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res_dup_desc.status_code, status.HTTP_400_BAD_REQUEST)
 
-        # 4. Bloqueio de duplicidade de código
-        res_dup_cod = self.client.post("/api/v1/operations/culturas/", {
-            "nome": "Outro Feijão",
-            "codigo": "FEJ-CAR",
+        # 4. Bloqueio de duplicidade de ID PIMS
+        res_dup_pims = self.client.post("/api/v1/operations/culturas/", {
+            "descricao": "FEIJÃO PRETO",
+            "id_pims": "PIMS-FEJ-01",
+            "fazenda": self.fazenda2.id,
         })
-        self.assertEqual(res_dup_cod.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(res_dup_pims.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("id_pims", res_dup_pims.data)
 
     def test_cultura_permissions(self):
         """Operador e Consultor podem consultar, mas não podem criar culturas."""
@@ -173,8 +170,8 @@ class PlanejamentoAgricolaTestCase(TestCase):
         self.assertEqual(res_list.status_code, status.HTTP_200_OK)
 
         res_create = self.client.post("/api/v1/operations/culturas/", {
-            "nome": "Trigo",
-            "codigo": "TRI-01"
+            "descricao": "TRIGO",
+            "fazenda": self.fazenda1.id,
         })
         self.assertEqual(res_create.status_code, status.HTTP_403_FORBIDDEN)
 
@@ -965,3 +962,220 @@ class PlanejamentoAgricolaTestCase(TestCase):
         self.assertEqual(plano.status, "CANCELADO")
         plano_valido.refresh_from_db()
         self.assertEqual(plano_valido.status, "EM_ANDAMENTO")
+
+    def test_cultura_id_pims_uniqueness_and_links(self):
+        self.client.force_authenticate(user=self.admin_user)
+        # 1. Tentar criar cultura via API com id_pims já existente deve retornar 400
+        url = "/api/v1/operations/culturas/"
+        payload_dup = {
+            "descricao": "SOJA DUPLICADA",
+            "id_pims": "PIMS-SOJ-01",  # Já usado por self.cultura_soja
+            "fazenda": self.fazenda1.id,
+        }
+        res_dup = self.client.post(url, payload_dup, format="json")
+        self.assertEqual(res_dup.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("id_pims", res_dup.data)
+
+        # 2. Criar cultura com novo id_pims válido e vínculo com fazenda
+        payload_ok = {
+            "descricao": "ALGODAO SAFRA",
+            "id_pims": "PIMS-ALG-01",
+            "fazenda": self.fazenda1.id,
+        }
+        res_ok = self.client.post(url, payload_ok, format="json")
+        self.assertEqual(res_ok.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res_ok.data["descricao"], "ALGODAO SAFRA")
+        self.assertEqual(res_ok.data["fazenda"], self.fazenda1.id)
+        self.assertNotIn("talhao", res_ok.data)
+        self.assertNotIn("ativo", res_ok.data)
+
+        # 3. Permite múltiplos sem id_pims (em branco)
+        payload_empty1 = {
+            "descricao": "CULTURA SEM PIMS 1",
+            "id_pims": "",
+            "fazenda": self.fazenda1.id,
+        }
+        payload_empty2 = {
+            "descricao": "CULTURA SEM PIMS 2",
+            "id_pims": "",
+            "fazenda": self.fazenda2.id,
+        }
+        res_emp1 = self.client.post(url, payload_empty1, format="json")
+        res_emp2 = self.client.post(url, payload_empty2, format="json")
+        self.assertEqual(res_emp1.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(res_emp2.status_code, status.HTTP_201_CREATED)
+
+        # 4. Filtro de culturas por fazenda
+        res_list = self.client.get(f"{url}?fazenda={self.fazenda1.id}")
+        self.assertEqual(res_list.status_code, status.HTTP_200_OK)
+        cultura_ids = [c["id"] for c in res_list.data["results"]]
+        self.assertIn(res_ok.data["id"], cultura_ids)
+
+    # --- TESTES DE DATAS REAIS, SOBREPOSIÇÃO E CÁLCULO DE PERÍODOS LIVRES ---
+    def test_planejamento_datas_reais_e_validacoes(self):
+        """Validação de datas reais (opcionais e cronológicas) sem apagar as datas previstas."""
+        self.client.force_authenticate(user=self.admin_user)
+
+        # 1. Criação com apenas datas previstas (sucesso, datas reais nulas)
+        res = self.client.post("/api/v1/operations/planos/", {
+            "safra": str(self.safra.id),
+            "cultura": str(self.cultura_soja.id),
+            "fazenda": str(self.fazenda1.id),
+            "pivo": str(self.pivo1.id),
+            "data_plantio": "2024-10-15",
+            "data_colheita_prevista": "2025-02-15",
+            "area_planejada_ha": 90.00,
+        })
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+        plano_id = res.data["id"]
+        self.assertIsNone(res.data["data_plantio_real"])
+        self.assertIsNone(res.data["data_colheita_real"])
+
+        # 2. Informar colheita real anterior ao plantio real deve falhar
+        res_inv = self.client.patch(f"/api/v1/operations/planos/{plano_id}/", {
+            "data_plantio_real": "2024-10-20",
+            "data_colheita_real": "2024-10-10",
+        })
+        self.assertEqual(res_inv.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("data_colheita_real", res_inv.data)
+
+        # 3. Informar plantio real e colheita real válidos preservando datas previstas
+        res_val = self.client.patch(f"/api/v1/operations/planos/{plano_id}/", {
+            "data_plantio_real": "2024-10-18",
+            "data_colheita_real": "2025-02-10",
+        })
+        self.assertEqual(res_val.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_val.data["data_plantio"], "2024-10-15")
+        self.assertEqual(res_val.data["data_colheita_prevista"], "2025-02-15")
+        self.assertEqual(res_val.data["data_plantio_real"], "2024-10-18")
+        self.assertEqual(res_val.data["data_colheita_real"], "2025-02-10")
+
+    def test_planejamento_sobreposicao_e_autorizacao(self):
+        """Detecção de conflito por sobreposição de datas no mesmo pivô e autorização auditável."""
+        self.client.force_authenticate(user=self.admin_user)
+
+        # 1. Cria primeiro plano no PIV-01
+        res1 = self.client.post("/api/v1/operations/planos/", {
+            "safra": str(self.safra.id),
+            "cultura": str(self.cultura_milho.id),
+            "fazenda": str(self.fazenda1.id),
+            "pivo": str(self.pivo1.id),
+            "data_plantio": "2024-10-10",
+            "data_colheita_prevista": "2024-12-20",
+            "area_planejada_ha": 90.00,
+        })
+        self.assertEqual(res1.status_code, status.HTTP_201_CREATED)
+
+        # 2. Tenta criar segundo plano no MESMO PIV-01 com período sobreposto (2024-12-01 a 2025-02-28)
+        res_conflito = self.client.post("/api/v1/operations/planos/", {
+            "safra": str(self.safra.id),
+            "cultura": str(self.cultura_soja.id),
+            "fazenda": str(self.fazenda1.id),
+            "pivo": str(self.pivo1.id),
+            "data_plantio": "2024-12-01",
+            "data_colheita_prevista": "2025-02-28",
+            "area_planejada_ha": 90.00,
+        })
+        self.assertEqual(res_conflito.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("conflito_sobreposicao", res_conflito.data)
+
+        # 3. Tenta autorizar sem justificativa auditável (deve falhar)
+        res_sem_just = self.client.post("/api/v1/operations/planos/", {
+            "safra": str(self.safra.id),
+            "cultura": str(self.cultura_soja.id),
+            "fazenda": str(self.fazenda1.id),
+            "pivo": str(self.pivo1.id),
+            "data_plantio": "2024-12-01",
+            "data_colheita_prevista": "2025-02-28",
+            "area_planejada_ha": 90.00,
+            "permite_sobreposicao": True,
+            "justificativa_sobreposicao": "",
+        })
+        self.assertEqual(res_sem_just.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn("justificativa_sobreposicao", res_sem_just.data)
+
+        # 4. Autorização expressa com justificativa auditável (sucesso)
+        res_aut = self.client.post("/api/v1/operations/planos/", {
+            "safra": str(self.safra.id),
+            "cultura": str(self.cultura_soja.id),
+            "fazenda": str(self.fazenda1.id),
+            "pivo": str(self.pivo1.id),
+            "data_plantio": "2024-12-01",
+            "data_colheita_prevista": "2025-02-28",
+            "area_planejada_ha": 90.00,
+            "permite_sobreposicao": True,
+            "justificativa_sobreposicao": "Autorizado pela gerência para plantio antecipado em área dessecada.",
+        })
+        self.assertEqual(res_aut.status_code, status.HTTP_201_CREATED)
+        self.assertTrue(res_aut.data["permite_sobreposicao"])
+        self.assertIn("Autorizado pela gerência", res_aut.data["justificativa_sobreposicao"])
+
+    def test_planejamento_periodos_livres_gantt(self):
+        """Cálculo dinâmico do Gantt com períodos livres e recálculo após colheita real."""
+        self.client.force_authenticate(user=self.admin_user)
+
+        # Safra ampla para 2025
+        safra_2025 = Safra.objects.create(
+            nome="Safra 2025 Anual",
+            data_inicio=date(2025, 1, 1),
+            data_fim=date(2025, 12, 31),
+            fazenda=self.fazenda1,
+            empresa=self.empresa
+        )
+
+        # P01: Cultivo 1 - Milho (10/03 a 20/07/2025)
+        res_milho = self.client.post("/api/v1/operations/planos/", {
+            "safra": str(safra_2025.id),
+            "cultura": str(self.cultura_milho.id),
+            "fazenda": str(self.fazenda1.id),
+            "pivo": str(self.pivo1.id),
+            "data_plantio": "2025-03-10",
+            "data_colheita_prevista": "2025-07-20",
+            "area_planejada_ha": 90.00,
+        })
+        self.assertEqual(res_milho.status_code, status.HTTP_201_CREATED)
+        milho_id = res_milho.data["id"]
+
+        # P01: Cultivo 2 - Soja (05/09 a 15/12/2025)
+        res_soja = self.client.post("/api/v1/operations/planos/", {
+            "safra": str(safra_2025.id),
+            "cultura": str(self.cultura_soja.id),
+            "fazenda": str(self.fazenda1.id),
+            "pivo": str(self.pivo1.id),
+            "data_plantio": "2025-09-05",
+            "data_colheita_prevista": "2025-12-15",
+            "area_planejada_ha": 90.00,
+        })
+        self.assertEqual(res_soja.status_code, status.HTTP_201_CREATED)
+
+        # 1. Consulta o endpoint de calendário
+        res_cal = self.client.get(f"/api/v1/operations/planos/calendario/?pivo={self.pivo1.id}")
+        self.assertEqual(res_cal.status_code, status.HTTP_200_OK)
+        dados = res_cal.data
+        self.assertIn("periodos_livres", dados)
+        self.assertIn("events", dados)
+
+        # Intervalo livre esperado entre 20/07 e 05/09 = 47 dias
+        livres = dados["periodos_livres"]
+        self.assertEqual(len(livres), 1)
+        self.assertEqual(livres[0]["dias_livres"], 47)
+        self.assertEqual(livres[0]["start"], "2025-07-20")
+        self.assertEqual(livres[0]["end"], "2025-09-05")
+        self.assertEqual(livres[0]["label"], "LIVRE (47 dias)")
+
+        # 2. Registra colheita real do Milho antecipada para 10/07 (aumentando a janela livre)
+        self.client.patch(f"/api/v1/operations/planos/{milho_id}/", {
+            "data_colheita_real": "2025-07-10"
+        })
+
+        # Consulta novamente o calendário e confirma o recálculo dinâmico
+        res_cal2 = self.client.get(f"/api/v1/operations/planos/calendario/?pivo={self.pivo1.id}")
+        self.assertEqual(res_cal2.status_code, status.HTTP_200_OK)
+        livres2 = res_cal2.data["periodos_livres"]
+        self.assertEqual(len(livres2), 1)
+        # De 10/07 a 05/09 = 57 dias
+        self.assertEqual(livres2[0]["dias_livres"], 57)
+        self.assertEqual(livres2[0]["start"], "2025-07-10")
+        self.assertEqual(livres2[0]["label"], "LIVRE (57 dias)")
+
+

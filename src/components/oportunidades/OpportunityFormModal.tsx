@@ -416,7 +416,7 @@ export function OpportunityFormModal({
                 <option value="">Nenhuma cultura</option>
                 {crops.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.nome} {c.variedade ? `(${c.variedade})` : ""}
+                    {c.descricao}{c.id_pims ? ` · PIMS: ${c.id_pims}` : ""}
                   </option>
                 ))}
               </select>

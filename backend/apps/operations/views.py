@@ -29,6 +29,7 @@ from .services import (
     executar_transicao_status,
     executar_transicao_oportunidade,
     avaliar_regras_oportunidades,
+    calcular_cronograma_disponibilidade,
 )
 from drf_spectacular.utils import extend_schema
 
@@ -47,19 +48,17 @@ class CulturaViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        ativo = self.request.query_params.get("ativo")
-        if ativo is not None:
-            if ativo.lower() in ["true", "1"]:
-                qs = qs.filter(ativo=True)
-            elif ativo.lower() in ["false", "0"]:
-                qs = qs.filter(ativo=False)
+        fazenda = self.request.query_params.get("fazenda")
+        if fazenda:
+            qs = qs.filter(fazenda_id=fazenda)
 
         search = self.request.query_params.get("search")
         if search:
             qs = qs.filter(
-                Q(nome__icontains=search) |
-                Q(codigo__icontains=search) |
-                Q(variedade__icontains=search)
+                Q(descricao__icontains=search) |
+                Q(id_pims__icontains=search) |
+                Q(fazenda__nome__icontains=search) |
+                Q(fazenda__filial__icontains=search)
             )
         return qs
 
@@ -157,7 +156,7 @@ class PlanoOperacionalViewSet(viewsets.ModelViewSet):
         search = self.request.query_params.get("search")
         if search:
             qs = qs.filter(
-                Q(cultura__nome__icontains=search) |
+                Q(cultura__descricao__icontains=search) |
                 Q(safra__nome__icontains=search) |
                 Q(pivo__codigo__icontains=search) |
                 Q(pivo__nome__icontains=search) |
@@ -187,6 +186,10 @@ class PlanoOperacionalViewSet(viewsets.ModelViewSet):
                 "area_planejada_ha": float(instance.area_planejada_ha),
                 "data_plantio": str(instance.data_plantio),
                 "data_colheita_prevista": str(instance.data_colheita_prevista),
+                "data_plantio_real": str(instance.data_plantio_real) if instance.data_plantio_real else None,
+                "data_colheita_real": str(instance.data_colheita_real) if instance.data_colheita_real else None,
+                "permite_sobreposicao": instance.permite_sobreposicao,
+                "justificativa_sobreposicao": instance.justificativa_sobreposicao,
                 "status": instance.status,
             },
             usuario=self.request.user if self.request.user.is_authenticated else None,
@@ -205,6 +208,10 @@ class PlanoOperacionalViewSet(viewsets.ModelViewSet):
                 "area_planejada_ha": float(instance.area_planejada_ha),
                 "data_plantio": str(instance.data_plantio),
                 "data_colheita_prevista": str(instance.data_colheita_prevista),
+                "data_plantio_real": str(instance.data_plantio_real) if instance.data_plantio_real else None,
+                "data_colheita_real": str(instance.data_colheita_real) if instance.data_colheita_real else None,
+                "permite_sobreposicao": instance.permite_sobreposicao,
+                "justificativa_sobreposicao": instance.justificativa_sobreposicao,
             },
             usuario=self.request.user if self.request.user.is_authenticated else None,
         )
@@ -266,29 +273,8 @@ class PlanoOperacionalViewSet(viewsets.ModelViewSet):
             ano_num = int(ano)
             qs = qs.filter(Q(data_plantio__year=ano_num) | Q(data_colheita_prevista__year=ano_num))
 
-        events = []
-        for p in qs:
-            alvo_nome = p.pivo.codigo if p.pivo else (p.talhao.codigo if p.talhao else (p.fazenda.nome if p.fazenda else "Área"))
-            events.append({
-                "id": str(p.id),
-                "title": f"{p.cultura.nome} · {alvo_nome}",
-                "safra_id": str(p.safra_id),
-                "safra_nome": p.safra.nome,
-                "cultura_id": str(p.cultura_id),
-                "cultura_nome": p.cultura.nome,
-                "fazenda_id": str(p.fazenda_id) if p.fazenda_id else None,
-                "fazenda_nome": p.fazenda.nome if p.fazenda else "",
-                "talhao_id": str(p.talhao_id) if p.talhao_id else None,
-                "talhao_codigo": p.talhao.codigo if p.talhao else "",
-                "pivo_id": str(p.pivo_id) if p.pivo_id else None,
-                "pivo_codigo": p.pivo.codigo if p.pivo else "",
-                "start": str(p.data_plantio),
-                "end": str(p.data_colheita_prevista),
-                "area_planejada_ha": float(p.area_planejada_ha),
-                "status": p.status,
-                "status_display": p.get_status_display(),
-            })
-        return Response({"events": events, "total": len(events)})
+        dados_calendario = calcular_cronograma_disponibilidade(qs)
+        return Response(dados_calendario)
 
     @action(detail=False, methods=["get"], url_path="indicadores", permission_classes=[IsAuthenticated])
     def indicadores(self, request):
@@ -541,7 +527,7 @@ class JanelaOportunidadeViewSet(viewsets.ModelViewSet):
                 Q(pivo__codigo__icontains=search) |
                 Q(pivo__nome__icontains=search) |
                 Q(fazenda__nome__icontains=search) |
-                Q(cultura__nome__icontains=search) |
+                Q(cultura__descricao__icontains=search) |
                 Q(safra__nome__icontains=search)
             )
 

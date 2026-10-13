@@ -29,19 +29,19 @@ class Command(BaseCommand):
 
         # 3. Culturas (Idempotente)
         culturas_catalogo = [
-            {"nome": "Soja", "codigo": "SOJ-01", "variedade": "TMG 7062 IPRO", "dias_ciclo_estimado": 115, "coeficiente_kc_padrao": 1.15, "descricao": "Soja grão ciclo médio para plantio em safra de verão."},
-            {"nome": "Milho", "codigo": "MIL-01", "variedade": "P3707 VYHR", "dias_ciclo_estimado": 135, "coeficiente_kc_padrao": 1.20, "descricao": "Milho safrinha alta produtividade sob irrigação por pivô central."},
-            {"nome": "Feijão", "codigo": "FEJ-01", "variedade": "BRS Estilo", "dias_ciclo_estimado": 85, "coeficiente_kc_padrao": 1.05, "descricao": "Feijão carioca de ciclo precoce com tolerância ao estresse hídrico."},
-            {"nome": "Algodão", "codigo": "ALG-01", "variedade": "DP 1744 B2RF", "dias_ciclo_estimado": 160, "coeficiente_kc_padrao": 1.10, "descricao": "Algodão de fibra média-longa com alta exigência de lâmina."},
+            {"key": "SOJ-01", "descricao": "SOJA GRÃO", "id_pims": "PIMS-SOJA"},
+            {"key": "MIL-01", "descricao": "MILHO SAFRINHA", "id_pims": "PIMS-MILHO"},
+            {"key": "FEJ-01", "descricao": "FEIJÃO CARIOCA", "id_pims": "PIMS-FEIJAO"},
+            {"key": "ALG-01", "descricao": "ALGODÃO", "id_pims": "PIMS-ALGODAO"},
         ]
 
         culturas_map = {}
         for c in culturas_catalogo:
             obj, _ = Cultura.objects.get_or_create(
-                codigo=c["codigo"],
-                defaults=c
+                descricao=c["descricao"],
+                defaults={"id_pims": c["id_pims"]}
             )
-            culturas_map[c["codigo"]] = obj
+            culturas_map[c["key"]] = obj
 
         # 4. Safras
         safra_verao, _ = Safra.objects.get_or_create(

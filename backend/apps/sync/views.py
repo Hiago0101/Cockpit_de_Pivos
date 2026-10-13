@@ -296,7 +296,7 @@ class SyncPullView(APIView):
         fazendas = Fazenda.objects.filter(ativo=True)
         talhoes = Talhao.objects.filter(ativo=True)
         pivos = Pivo.objects.filter(ativo=True)
-        culturas = Cultura.objects.filter(ativo=True)
+        culturas = Cultura.objects.all()
         safras = Safra.objects.filter(ativa=True)
         planos = PlanoOperacional.objects.select_related("safra", "cultura", "fazenda", "talhao", "pivo").all()
         irrigacoes = RegistroIrrigacao.objects.all()[:50]

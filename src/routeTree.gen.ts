@@ -14,6 +14,7 @@ import { Route as AlertasRouteImport } from './routes/alertas'
 import { Route as CalendarioRouteImport } from './routes/calendario'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as CulturasRouteImport } from './routes/culturas'
+import { Route as FazendasRouteImport } from './routes/fazendas'
 import { Route as IndicadoresRouteImport } from './routes/indicadores'
 import { Route as IrrigacaoRouteImport } from './routes/irrigacao'
 import { Route as JanelasDeOportunidadeRouteImport } from './routes/janelas-de-oportunidade'
@@ -21,7 +22,9 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as MapaRouteImport } from './routes/mapa'
 import { Route as OperacoesRouteImport } from './routes/operacoes'
 import { Route as PlanejamentoRouteImport } from './routes/planejamento'
+import { Route as SafrasRouteImport } from './routes/safras'
 import { Route as SistemaRouteImport } from './routes/sistema'
+import { Route as TalhoesRouteImport } from './routes/talhoes'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,6 +49,11 @@ const ConfiguracoesRoute = ConfiguracoesRouteImport.update({
 const CulturasRoute = CulturasRouteImport.update({
   id: '/culturas',
   path: '/culturas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FazendasRoute = FazendasRouteImport.update({
+  id: '/fazendas',
+  path: '/fazendas',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndicadoresRoute = IndicadoresRouteImport.update({
@@ -83,9 +91,19 @@ const PlanejamentoRoute = PlanejamentoRouteImport.update({
   path: '/planejamento',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SafrasRoute = SafrasRouteImport.update({
+  id: '/safras',
+  path: '/safras',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SistemaRoute = SistemaRouteImport.update({
   id: '/sistema',
   path: '/sistema',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TalhoesRoute = TalhoesRouteImport.update({
+  id: '/talhoes',
+  path: '/talhoes',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -95,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/calendario': typeof CalendarioRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/culturas': typeof CulturasRoute
+  '/fazendas': typeof FazendasRoute
   '/indicadores': typeof IndicadoresRoute
   '/irrigacao': typeof IrrigacaoRoute
   '/janelas-de-oportunidade': typeof JanelasDeOportunidadeRoute
@@ -102,7 +121,9 @@ export interface FileRoutesByFullPath {
   '/mapa': typeof MapaRoute
   '/operacoes': typeof OperacoesRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/safras': typeof SafrasRoute
   '/sistema': typeof SistemaRoute
+  '/talhoes': typeof TalhoesRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -110,6 +131,7 @@ export interface FileRoutesByTo {
   '/calendario': typeof CalendarioRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/culturas': typeof CulturasRoute
+  '/fazendas': typeof FazendasRoute
   '/indicadores': typeof IndicadoresRoute
   '/irrigacao': typeof IrrigacaoRoute
   '/janelas-de-oportunidade': typeof JanelasDeOportunidadeRoute
@@ -117,7 +139,9 @@ export interface FileRoutesByTo {
   '/mapa': typeof MapaRoute
   '/operacoes': typeof OperacoesRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/safras': typeof SafrasRoute
   '/sistema': typeof SistemaRoute
+  '/talhoes': typeof TalhoesRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -126,6 +150,7 @@ export interface FileRoutesById {
   '/calendario': typeof CalendarioRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/culturas': typeof CulturasRoute
+  '/fazendas': typeof FazendasRoute
   '/indicadores': typeof IndicadoresRoute
   '/irrigacao': typeof IrrigacaoRoute
   '/janelas-de-oportunidade': typeof JanelasDeOportunidadeRoute
@@ -133,7 +158,9 @@ export interface FileRoutesById {
   '/mapa': typeof MapaRoute
   '/operacoes': typeof OperacoesRoute
   '/planejamento': typeof PlanejamentoRoute
+  '/safras': typeof SafrasRoute
   '/sistema': typeof SistemaRoute
+  '/talhoes': typeof TalhoesRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -143,6 +170,7 @@ export interface FileRouteTypes {
     | '/calendario'
     | '/configuracoes'
     | '/culturas'
+    | '/fazendas'
     | '/indicadores'
     | '/irrigacao'
     | '/janelas-de-oportunidade'
@@ -150,7 +178,9 @@ export interface FileRouteTypes {
     | '/mapa'
     | '/operacoes'
     | '/planejamento'
+    | '/safras'
     | '/sistema'
+    | '/talhoes'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -158,6 +188,7 @@ export interface FileRouteTypes {
     | '/calendario'
     | '/configuracoes'
     | '/culturas'
+    | '/fazendas'
     | '/indicadores'
     | '/irrigacao'
     | '/janelas-de-oportunidade'
@@ -165,7 +196,9 @@ export interface FileRouteTypes {
     | '/mapa'
     | '/operacoes'
     | '/planejamento'
+    | '/safras'
     | '/sistema'
+    | '/talhoes'
   id:
     | '__root__'
     | '/'
@@ -173,6 +206,7 @@ export interface FileRouteTypes {
     | '/calendario'
     | '/configuracoes'
     | '/culturas'
+    | '/fazendas'
     | '/indicadores'
     | '/irrigacao'
     | '/janelas-de-oportunidade'
@@ -180,7 +214,9 @@ export interface FileRouteTypes {
     | '/mapa'
     | '/operacoes'
     | '/planejamento'
+    | '/safras'
     | '/sistema'
+    | '/talhoes'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -189,6 +225,7 @@ export interface RootRouteChildren {
   CalendarioRoute: typeof CalendarioRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   CulturasRoute: typeof CulturasRoute
+  FazendasRoute: typeof FazendasRoute
   IndicadoresRoute: typeof IndicadoresRoute
   IrrigacaoRoute: typeof IrrigacaoRoute
   JanelasDeOportunidadeRoute: typeof JanelasDeOportunidadeRoute
@@ -196,7 +233,9 @@ export interface RootRouteChildren {
   MapaRoute: typeof MapaRoute
   OperacoesRoute: typeof OperacoesRoute
   PlanejamentoRoute: typeof PlanejamentoRoute
+  SafrasRoute: typeof SafrasRoute
   SistemaRoute: typeof SistemaRoute
+  TalhoesRoute: typeof TalhoesRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -234,6 +273,13 @@ declare module '@tanstack/react-router' {
       path: '/culturas'
       fullPath: '/culturas'
       preLoaderRoute: typeof CulturasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fazendas': {
+      id: '/fazendas'
+      path: '/fazendas'
+      fullPath: '/fazendas'
+      preLoaderRoute: typeof FazendasRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/indicadores': {
@@ -285,11 +331,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PlanejamentoRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/safras': {
+      id: '/safras'
+      path: '/safras'
+      fullPath: '/safras'
+      preLoaderRoute: typeof SafrasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sistema': {
       id: '/sistema'
       path: '/sistema'
       fullPath: '/sistema'
       preLoaderRoute: typeof SistemaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/talhoes': {
+      id: '/talhoes'
+      path: '/talhoes'
+      fullPath: '/talhoes'
+      preLoaderRoute: typeof TalhoesRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -301,6 +361,7 @@ const rootRouteChildren: RootRouteChildren = {
   CalendarioRoute: CalendarioRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
   CulturasRoute: CulturasRoute,
+  FazendasRoute: FazendasRoute,
   IndicadoresRoute: IndicadoresRoute,
   IrrigacaoRoute: IrrigacaoRoute,
   JanelasDeOportunidadeRoute: JanelasDeOportunidadeRoute,
@@ -308,7 +369,9 @@ const rootRouteChildren: RootRouteChildren = {
   MapaRoute: MapaRoute,
   OperacoesRoute: OperacoesRoute,
   PlanejamentoRoute: PlanejamentoRoute,
+  SafrasRoute: SafrasRoute,
   SistemaRoute: SistemaRoute,
+  TalhoesRoute: TalhoesRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -90,7 +90,11 @@ class JanelasOportunidadeTestCase(TestCase):
             area_irrigada_ha=Decimal("110.00"),
         )
 
-        self.cultura = Cultura.objects.create(nome="Soja", variedade="TMG 7062")
+        self.cultura = Cultura.objects.create(
+            descricao="SOJA",
+            id_pims="PIMS-SOJA",
+            fazenda=self.fazenda1,
+        )
         self.safra = Safra.objects.create(
             nome="Safra Verão 2026/2027",
             data_inicio=date.today(),
@@ -144,7 +148,7 @@ class JanelasOportunidadeTestCase(TestCase):
         self.assertEqual(data["prioridade"], "ALTA")
         self.assertEqual(data["status"], "DETECTADA")
         self.assertEqual(data["pivo_codigo"], "PIV-01")
-        self.assertEqual(data["fazenda_nome"], "Fazenda Santa Maria")
+        self.assertEqual(data["fazenda_nome"], "FAZENDA SANTA MARIA")
 
         # Verifica criação do AuditLog
         self.assertTrue(

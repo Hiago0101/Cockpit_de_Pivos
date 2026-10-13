@@ -207,13 +207,13 @@ export function AgriculturalStructureView() {
                 <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-3">
                   <div className="flex items-center gap-2.5">
                     <div className="grid size-8 place-items-center rounded-lg bg-primary/10 text-primary font-bold text-xs">
-                      {farm.codigo.slice(0, 3)}
+                      {(farm.codigo || farm.filial || "FAZ").slice(0, 3)}
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-foreground flex items-center gap-2">
                         {farm.nome}
                         <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0">
-                          {farm.codigo}
+                          {farm.codigo || farm.filial || "—"}
                         </Badge>
                       </h4>
                       <p className="text-xs text-muted-foreground">

@@ -25,9 +25,11 @@ class Fazenda(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     empresa = models.ForeignKey(Empresa, on_delete=models.SET_NULL, null=True, blank=True, related_name="fazendas")
     nome = models.CharField(max_length=150)
-    codigo = models.CharField(max_length=50, unique=True)
-    municipio = models.CharField(max_length=100)
-    uf = models.CharField(max_length=2)
+    codigo = models.CharField(max_length=50, blank=True, default="")
+    filial = models.CharField(max_length=6, blank=True, default="", help_text="Código da filial (máx 6 dígitos)")
+    id_pims = models.CharField(max_length=50, blank=True, default="", help_text="Identificador no PIMS (opcional)")
+    municipio = models.CharField(max_length=100, blank=True, default="")
+    uf = models.CharField(max_length=2, blank=True, default="")
     latitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     area_total_ha = models.DecimalField(max_digits=10, decimal_places=2, default=0.0)
@@ -40,16 +42,28 @@ class Fazenda(models.Model):
         verbose_name = "Fazenda"
         verbose_name_plural = "Fazendas"
 
+    def save(self, *args, **kwargs):
+        if self.nome:
+            self.nome = self.nome.strip().upper()
+        if not self.codigo:
+            self.codigo = self.filial or f"FAZ-{str(self.id)[:8]}"
+        if not self.filial and self.codigo and len(self.codigo) <= 6:
+            self.filial = self.codigo
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.nome} ({self.codigo})"
+        ident = self.filial or self.codigo or str(self.id)[:8]
+        return f"{self.nome} ({ident})"
 
 class Talhao(models.Model):
     """Subdivisão geográfica e agronômica da fazenda."""
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    fazenda = models.ForeignKey(Fazenda, on_delete=models.CASCADE, related_name="talhoes")
+    fazenda = models.ForeignKey(Fazenda, on_delete=models.PROTECT, related_name="talhoes")
     codigo = models.CharField(max_length=50)
-    nome = models.CharField(max_length=100)
-    area_ha = models.DecimalField(max_digits=8, decimal_places=2)
+    nome = models.CharField(max_length=100, blank=True, default="")
+    descricao = models.CharField(max_length=255, blank=True, default="", help_text="Descrição do talhão")
+    id_pims = models.CharField(max_length=50, blank=True, default="", help_text="Identificador no PIMS (opcional)")
+    area_ha = models.DecimalField(max_digits=8, decimal_places=2, default=0.0, blank=True)
     ativo = models.BooleanField(default=True)
     criado_em = models.DateTimeField(auto_now_add=True)
     atualizado_em = models.DateTimeField(auto_now=True)
@@ -60,8 +74,20 @@ class Talhao(models.Model):
         verbose_name = "Talhão"
         verbose_name_plural = "Talhões"
 
+    def save(self, *args, **kwargs):
+        if self.codigo:
+            self.codigo = self.codigo.strip().upper()
+        if self.id_pims:
+            self.id_pims = self.id_pims.strip()
+        if self.descricao and not self.nome:
+            self.nome = self.descricao[:100]
+        elif self.nome and not self.descricao:
+            self.descricao = self.nome
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return f"{self.fazenda.nome} - {self.codigo} ({self.nome})"
+        desc = self.descricao or self.nome or self.codigo
+        return f"{self.fazenda.nome} - {self.codigo} ({desc})"
 
 class PivoStatus(models.TextChoices):
     PARADO = "PARADO", "Parado / Desligado"

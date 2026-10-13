@@ -16,6 +16,8 @@ describe("App routing", () => {
   });
 
   it.each([
+    "/fazendas",
+    "/talhoes",
     "/mapa",
     "/planejamento",
     "/janelas-de-oportunidade",

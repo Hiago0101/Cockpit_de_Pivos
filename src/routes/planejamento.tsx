@@ -28,7 +28,7 @@ function PlanejamentoPage() {
   const [activeTab, setActiveTab] = useState<TabType>("planos");
 
   return (
-    <div className="space-y-6 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+    <div className="flex-1 space-y-4 p-2 sm:p-4 lg:p-6 w-full">
       {/* Top Banner do Módulo */}
       <div className="rounded-2xl border border-border bg-card p-6 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -40,11 +40,10 @@ function PlanejamentoPage() {
               <span className="text-xs text-muted-foreground">· Gestão Agronômica</span>
             </div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              Planejamento Agrícola de Safras
+              Planejamento de Plantio
             </h1>
             <p className="text-sm text-muted-foreground max-w-2xl">
-              Organize a estrutura agrícola, planeje ciclos de cultivo por talhão e pivô central,
-              acompanhe o cronograma de plantio e colheita e monitore indicadores de ocupação em hectares.
+              Gerencie o calendário de culturas, plantios, colheitas e disponibilidade dos pivôs
             </p>
           </div>
 

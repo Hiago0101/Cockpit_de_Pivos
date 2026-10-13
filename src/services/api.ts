@@ -20,38 +20,42 @@ export interface Farm {
   empresa?: string | null;
   empresa_nome?: string;
   nome: string;
-  codigo: string;
-  municipio: string;
-  uf: string;
-  latitude: number | null;
-  longitude: number | null;
-  area_total_ha: number;
+  codigo?: string;
+  filial?: string;
+  id_pims?: string;
+  municipio?: string;
+  uf?: string;
+  latitude?: number | null;
+  longitude?: number | null;
+  area_total_ha?: number;
   ativo?: boolean;
   pivos_count?: number;
+  criado_em?: string;
+  atualizado_em?: string;
 }
 
 export interface Field {
   id: string;
   fazenda: string;
   fazenda_nome?: string;
+  fazenda_filial?: string;
   codigo: string;
-  nome: string;
-  area_ha: number;
-  ativo: boolean;
+  nome?: string;
+  descricao?: string;
+  id_pims?: string;
+  area_ha?: number;
+  ativo?: boolean;
   criado_em?: string;
   atualizado_em?: string;
 }
 
 export interface Crop {
   id: string;
-  nome: string;
-  codigo: string;
-  variedade: string;
   descricao: string;
-  dias_ciclo_estimado: number;
-  coeficiente_kc_padrao: number;
-  ativo: boolean;
-  observacoes: string;
+  fazenda?: string | null;
+  fazenda_nome?: string;
+  fazenda_filial?: string;
+  id_pims?: string;
   criado_em?: string;
   atualizado_em?: string;
 }
@@ -98,11 +102,17 @@ export interface CropPlan {
   pivo_area_irrigada_ha?: number;
   data_plantio: string;
   data_colheita_prevista: string;
+  data_plantio_real?: string | null;
+  data_colheita_real?: string | null;
   area_planejada_ha: number;
   lamina_total_planejada_mm: number;
   lamina_acumulada_realizada_mm: number;
   status: CropPlanStatus;
   status_display: string;
+  permite_sobreposicao?: boolean;
+  justificativa_sobreposicao?: string;
+  autorizado_por?: string | null;
+  autorizado_por_nome?: string | null;
   observacoes: string;
   criado_em?: string;
   atualizado_em?: string;
@@ -121,11 +131,78 @@ export interface PlanCalendarEvent {
   talhao_codigo?: string;
   pivo_id?: string | null;
   pivo_codigo?: string;
+  pivo_nome?: string;
   start: string;
   end: string;
+  data_plantio: string;
+  data_colheita_prevista: string;
+  data_plantio_real?: string | null;
+  data_colheita_real?: string | null;
   area_planejada_ha: number;
+  duracao_planejada_dias?: number;
+  duracao_real_dias?: number | null;
   status: CropPlanStatus;
   status_display: string;
+  permite_sobreposicao?: boolean;
+  justificativa_sobreposicao?: string;
+  observacoes?: string;
+}
+
+export interface FreePeriodWindow {
+  id: string;
+  pivo_id?: string | null;
+  pivo_codigo?: string;
+  talhao_id?: string | null;
+  talhao_codigo?: string;
+  fazenda_id?: string | null;
+  fazenda_nome?: string;
+  start: string;
+  end: string;
+  dias_livres: number;
+  label: string;
+  tipo: "LIVRE";
+  cultura_anterior: string;
+  cultura_proxima: string;
+  plano_anterior_id: string;
+  plano_proximo_id: string;
+}
+
+export interface PlanningConflict {
+  id: string;
+  pivo_id?: string | null;
+  pivo_codigo?: string;
+  talhao_id?: string | null;
+  talhao_codigo?: string;
+  fazenda_id?: string | null;
+  fazenda_nome?: string;
+  start: string;
+  end: string;
+  dias_sobreposicao: number;
+  label: string;
+  tipo: "CONFLITO";
+  cultura_anterior: string;
+  cultura_proxima: string;
+  plano_anterior_id: string;
+  plano_proximo_id: string;
+  mensagem: string;
+}
+
+export interface PlanCalendarResponse {
+  events: PlanCalendarEvent[];
+  total: number;
+  periodos_livres?: FreePeriodWindow[];
+  conflitos?: PlanningConflict[];
+  sem_planejamento_futuro?: Array<{
+    pivo_id?: string | null;
+    pivo_codigo?: string;
+    talhao_id?: string | null;
+    talhao_codigo?: string;
+    fazenda_id?: string | null;
+    fazenda_nome?: string;
+    apos_data: string;
+    ultima_cultura: string;
+    tipo: "SEM_PLANEJAMENTO_FUTURO";
+  }>;
 }
 
 export interface PlanningIndicators {
@@ -473,8 +550,23 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
         }
       }
       const errorBody = await response.json().catch(() => ({}));
-      const message = errorBody.detail || errorBody.message || `Erro HTTP ${response.status} na API`;
-      throw new Error(message);
+      const message =
+        errorBody.detail ||
+        errorBody.message ||
+        (typeof errorBody === "object" ? Object.values(errorBody).flat().join(" ") : "") ||
+        `Erro HTTP ${response.status} na API`;
+      throw new Error(message || `Erro HTTP ${response.status} na API`);
+    }
+
+    if (response.status === 204 || response.headers?.get?.("content-length") === "0") {
+      return {} as T;
+    }
+    if (typeof response.text === "function") {
+      const text = await response.text();
+      if (!text || !text.trim()) {
+        return {} as T;
+      }
+      return JSON.parse(text) as T;
     }
     return (await response.json()) as T;
   } catch (error) {
@@ -551,6 +643,25 @@ export const api = {
   // Fazendas
   getFarms: () =>
     request<Farm[] | { results: Farm[] }>("/pivots/fazendas/").then((res) => (Array.isArray(res) ? res : res.results)),
+
+  getFarm: (id: string) => request<Farm>(`/pivots/fazendas/${id}/`),
+
+  createFarm: (data: Partial<Farm>) =>
+    request<Farm>("/pivots/fazendas/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  updateFarm: (id: string, data: Partial<Farm>) =>
+    request<Farm>(`/pivots/fazendas/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+
+  deleteFarm: (id: string) =>
+    request<void>(`/pivots/fazendas/${id}/`, {
+      method: "DELETE",
+    }),
 
   // Pivôs
   getPivots: (filters?: { fazenda?: string; status?: string }) => {
@@ -643,11 +754,15 @@ export const api = {
       body: JSON.stringify(data),
     }),
 
-  // --- CATÁLOGO DE CULTURAS ---
-  getCrops: (filters?: { search?: string | undefined; ativo?: boolean | undefined }) => {
+  deleteField: (id: string) =>
+    request<{ detail?: string }>(`/pivots/talhoes/${id}/`, {
+      method: "DELETE",
+    }),
+
+  getCrops: (filters?: { search?: string | undefined; fazenda?: string | undefined }) => {
     const query = new URLSearchParams();
     if (filters?.search) query.set("search", filters.search);
-    if (filters?.ativo !== undefined) query.set("ativo", String(filters.ativo));
+    if (filters?.fazenda) query.set("fazenda", filters.fazenda);
     const qs = query.toString() ? `?${query.toString()}` : "";
     return request<Crop[] | { results: Crop[] }>(`/operations/culturas/${qs}`).then((res) =>
       Array.isArray(res) ? res : res.results
@@ -698,6 +813,11 @@ export const api = {
     request<Season>(`/operations/safras/${id}/`, {
       method: "PATCH",
       body: JSON.stringify(data),
+    }),
+
+  deleteSeason: (id: string) =>
+    request<{ detail?: string }>(`/operations/safras/${id}/`, {
+      method: "DELETE",
     }),
 
   // --- PLANOS DE CULTIVO (PLANEJAMENTO AGRÍCOLA) ---
@@ -753,15 +873,23 @@ export const api = {
       body: JSON.stringify({ status, motivo }),
     }),
 
-  getPlanCalendar: (filters?: { ano?: number | undefined; safra?: string | undefined; fazenda?: string | undefined; cultura?: string | undefined; status?: string | undefined }) => {
+  getPlanCalendar: (filters?: {
+    ano?: number | undefined;
+    safra?: string | undefined;
+    fazenda?: string | undefined;
+    cultura?: string | undefined;
+    status?: string | undefined;
+    pivo?: string | undefined;
+  }) => {
     const query = new URLSearchParams();
     if (filters?.ano) query.set("ano", String(filters.ano));
     if (filters?.safra) query.set("safra", filters.safra);
     if (filters?.fazenda) query.set("fazenda", filters.fazenda);
     if (filters?.cultura) query.set("cultura", filters.cultura);
     if (filters?.status) query.set("status", filters.status);
+    if (filters?.pivo) query.set("pivo", filters.pivo);
     const qs = query.toString() ? `?${query.toString()}` : "";
-    return request<{ events: PlanCalendarEvent[]; total: number }>(`/operations/planos/calendario/${qs}`);
+    return request<PlanCalendarResponse>(`/operations/planos/calendario/${qs}`);
   },
 
   getPlanIndicators: (filters?: { safra?: string | undefined; fazenda?: string | undefined }) => {

@@ -119,7 +119,8 @@ class LocalDatabase {
   public async updateLocalPlanStatus(
     id: string,
     status: CropPlanStatus,
-    motivo?: string
+    motivo?: string,
+    dataReal?: string
   ): Promise<MobileCropPlan | undefined> {
     const existing = this.planos.get(id);
     if (!existing) return undefined;
@@ -132,10 +133,15 @@ class LocalDatabase {
       CANCELADO: "Cancelado",
     };
 
+    const todayStr = new Date().toISOString().split("T")[0];
+    const dataOperacao = dataReal || todayStr;
+
     const updated: MobileCropPlan = {
       ...existing,
       status,
       status_display: statusDisplays[status] || status,
+      ...(status === "EM_ANDAMENTO" && !existing.data_plantio_real ? { data_plantio_real: dataOperacao } : {}),
+      ...(status === "CONCLUIDO" && !existing.data_colheita_real ? { data_colheita_real: dataOperacao } : {}),
       atualizado_em: new Date().toISOString(),
     };
     this.planos.set(id, updated);
@@ -148,6 +154,8 @@ class LocalDatabase {
       motivo: motivo || "Atualização operacional em campo",
       expected_status: existing.status,
       base_updated_at: existing.atualizado_em,
+      data_plantio_real: updated.data_plantio_real,
+      data_colheita_real: updated.data_colheita_real,
     });
 
     return updated;

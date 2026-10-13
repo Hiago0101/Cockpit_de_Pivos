@@ -1,26 +1,25 @@
 import {
-  AlertTriangle,
-  BarChart3,
+  Building2,
+  Calendar,
   CalendarDays,
   CircleGauge,
-  CloudSun,
-  Droplets,
-  Info,
+  Grid3x3,
   Leaf,
-  Map,
   Settings,
   Sprout,
-  Tractor,
   type LucideIcon,
 } from "lucide-react";
 
 export type AppPath =
   | "/"
+  | "/safras"
+  | "/fazendas"
+  | "/talhoes"
+  | "/culturas"
   | "/mapa"
   | "/planejamento"
   | "/janelas-de-oportunidade"
   | "/calendario"
-  | "/culturas"
   | "/irrigacao"
   | "/operacoes"
   | "/alertas"
@@ -34,22 +33,18 @@ export type NavigationItem = {
   icon: LucideIcon;
 };
 
+// Rotas ativas exibidas no painel esquerdo
 export const primaryNavigation: NavigationItem[] = [
   { label: "Cockpit", path: "/", icon: CircleGauge },
-  { label: "Mapa dos Pivôs", path: "/mapa", icon: Map },
   { label: "Planejamento", path: "/planejamento", icon: CalendarDays },
-  { label: "Janelas de Oportunidade", path: "/janelas-de-oportunidade", icon: CloudSun },
-  { label: "Calendário Operacional", path: "/calendario", icon: CalendarDays },
+  { label: "Safras", path: "/safras", icon: Calendar },
+  { label: "Fazendas", path: "/fazendas", icon: Building2 },
+  { label: "Talhões", path: "/talhoes", icon: Grid3x3 },
   { label: "Culturas", path: "/culturas", icon: Sprout },
-  { label: "Irrigação", path: "/irrigacao", icon: Droplets },
-  { label: "Operações", path: "/operacoes", icon: Tractor },
-  { label: "Alertas", path: "/alertas", icon: AlertTriangle },
-  { label: "Indicadores", path: "/indicadores", icon: BarChart3 },
 ];
 
 export const secondaryNavigation: NavigationItem[] = [
   { label: "Configurações", path: "/configuracoes", icon: Settings },
-  { label: "Informações do Sistema", path: "/sistema", icon: Info },
 ];
 
 export const BrandIcon = Leaf;

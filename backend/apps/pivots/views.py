@@ -36,11 +36,112 @@ class FazendaViewSet(viewsets.ModelViewSet):
                 qs = qs.filter(id__in=profile.fazendas.values_list("id", flat=True))
         return qs
 
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        user = self.request.user if self.request.user.is_authenticated else None
+        AuditLog.objects.create(
+            tabela="Fazenda",
+            entidade_id=str(instance.id),
+            acao="CREATE",
+            detalhes={
+                "nome": instance.nome,
+                "filial": instance.filial,
+                "id_pims": instance.id_pims,
+                "codigo": instance.codigo,
+            },
+            usuario=user,
+        )
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        user = self.request.user if self.request.user.is_authenticated else None
+        AuditLog.objects.create(
+            tabela="Fazenda",
+            entidade_id=str(instance.id),
+            acao="UPDATE",
+            detalhes={
+                "nome": instance.nome,
+                "filial": instance.filial,
+                "id_pims": instance.id_pims,
+                "codigo": instance.codigo,
+            },
+            usuario=user,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        from django.db.models import ProtectedError
+        instance = self.get_object()
+        user = request.user if request.user.is_authenticated else None
+
+        # Validação 1: Bloquear exclusão se existirem talhões vinculados
+        talhoes_count = instance.talhoes.count()
+        if talhoes_count > 0:
+            talhoes_codigos = list(instance.talhoes.values_list("codigo", flat=True)[:3])
+            exemplo = f" ({', '.join(talhoes_codigos)}{'...' if talhoes_count > 3 else ''})"
+            return Response(
+                {
+                    "detail": f"Não é possível excluir a fazenda '{instance.nome}' pois existem {talhoes_count} talhão(ões) vinculado(s) a ela{exemplo}. Exclua ou desvincule os talhões antes de excluir a fazenda."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # Validação 2: Bloquear exclusão se existirem pivôs vinculados
+        pivos_count = instance.pivos.count()
+        if pivos_count > 0:
+            pivos_codigos = list(instance.pivos.values_list("codigo", flat=True)[:3])
+            exemplo = f" ({', '.join(pivos_codigos)}{'...' if pivos_count > 3 else ''})"
+            return Response(
+                {
+                    "detail": f"Não é possível excluir a fazenda '{instance.nome}' pois existem {pivos_count} pivô(s) vinculado(s) a ela{exemplo}. Desvincule ou remova os pivôs antes de excluir a fazenda."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            nome_fazenda = instance.nome
+            filial_fazenda = instance.filial
+            id_pims_fazenda = instance.id_pims
+            codigo_fazenda = instance.codigo
+            entidade_id = str(instance.id)
+
+            instance.delete()
+
+            AuditLog.objects.create(
+                tabela="Fazenda",
+                entidade_id=entidade_id,
+                acao="DELETE",
+                detalhes={
+                    "nome": nome_fazenda,
+                    "filial": filial_fazenda,
+                    "id_pims": id_pims_fazenda,
+                    "codigo": codigo_fazenda,
+                },
+                usuario=user,
+            )
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ProtectedError as pe:
+            pivos_nomes = [getattr(obj, "nome", str(obj)) for obj in pe.protected_objects if hasattr(obj, "codigo") or hasattr(obj, "nome")]
+            lista_objs = f" ({', '.join(pivos_nomes[:3])})" if pivos_nomes else ""
+            return Response(
+                {
+                    "detail": f"Não é possível excluir a fazenda '{instance.nome}' porque existem registros vinculados a ela{lista_objs}. Desvincule os registros associados antes de excluir."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            return Response(
+                {
+                    "detail": f"Não é possível excluir a fazenda '{instance.nome}' pois existem registros vinculados a ela. Remova os pivôs e talhões associados primeiro."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
 class TalhaoViewSet(viewsets.ModelViewSet):
     """Gestão de Talhões vinculados às Fazendas."""
     queryset = Talhao.objects.select_related("fazenda").all()
     serializer_class = TalhaoSerializer
     filterset_fields = ["fazenda"]
+    search_fields = ["codigo", "nome", "descricao", "fazenda__nome", "fazenda__filial"]
 
     def get_permissions(self):
         if self.action in ["list", "retrieve"]:
@@ -58,6 +159,78 @@ class TalhaoViewSet(viewsets.ModelViewSet):
             if profile and profile.role != "ADMIN" and profile.fazendas.exists():
                 qs = qs.filter(fazenda__in=profile.fazendas.all())
         return qs
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        user = self.request.user if self.request.user.is_authenticated else None
+        AuditLog.objects.create(
+            tabela="Talhao",
+            entidade_id=str(instance.id),
+            acao="CREATE",
+            detalhes={
+                "fazenda_id": str(instance.fazenda_id),
+                "fazenda_nome": instance.fazenda.nome,
+                "codigo": instance.codigo,
+                "descricao": instance.descricao or instance.nome,
+            },
+            usuario=user,
+        )
+
+    def perform_update(self, serializer):
+        instance = serializer.save()
+        user = self.request.user if self.request.user.is_authenticated else None
+        AuditLog.objects.create(
+            tabela="Talhao",
+            entidade_id=str(instance.id),
+            acao="UPDATE",
+            detalhes={
+                "fazenda_id": str(instance.fazenda_id),
+                "fazenda_nome": instance.fazenda.nome,
+                "codigo": instance.codigo,
+                "descricao": instance.descricao or instance.nome,
+            },
+            usuario=user,
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        from django.db.models import ProtectedError
+        instance = self.get_object()
+        user = request.user if request.user.is_authenticated else None
+        try:
+            entidade_id = str(instance.id)
+            codigo = instance.codigo
+            descricao = instance.descricao or instance.nome
+            fazenda_nome = instance.fazenda.nome
+            instance.delete()
+
+            AuditLog.objects.create(
+                tabela="Talhao",
+                entidade_id=entidade_id,
+                acao="DELETE",
+                detalhes={
+                    "fazenda_nome": fazenda_nome,
+                    "codigo": codigo,
+                    "descricao": descricao,
+                },
+                usuario=user,
+            )
+            return Response(status=status.HTTP_204_NO_CONTENT)
+        except ProtectedError as pe:
+            pivos_nomes = [getattr(obj, "nome", str(obj)) for obj in pe.protected_objects if hasattr(obj, "codigo") or hasattr(obj, "nome")]
+            lista_objs = f" ({', '.join(pivos_nomes[:3])})" if pivos_nomes else ""
+            return Response(
+                {
+                    "detail": f"Não é possível excluir o talhão '{instance.codigo}' porque existem registros vinculados a ele{lista_objs}. Desvincule ou remova os pivôs associados antes de excluir."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        except Exception as e:
+            return Response(
+                {
+                    "detail": f"Não é possível excluir o talhão '{instance.codigo}' pois existem registros vinculados a ele."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
 class PivoViewSet(viewsets.ModelViewSet):
     """Cadastro, consulta e operação de Pivôs Centrais."""

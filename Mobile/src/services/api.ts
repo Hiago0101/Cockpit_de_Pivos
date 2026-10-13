@@ -5,6 +5,7 @@
  * Tokens NUNCA são registrados nos logs do console.
  */
 import { secureStorage } from "./storage";
+import { MobileFarm, MobileField } from "../types";
 
 let apiBaseUrl = (typeof process !== "undefined" && process.env?.["EXPO_PUBLIC_API_URL"])
   ? process.env["EXPO_PUBLIC_API_URL"]
@@ -199,5 +200,197 @@ export const mobileApi = {
       throw new Error(`HTTP ${res.status}`);
     }
     return res.json();
+  },
+
+  // --- FAZENDAS ---
+  getFarms: async (): Promise<MobileFarm[]> => {
+    let res: Response;
+    try {
+      res = await fetch(`${apiBaseUrl}/pivots/fazendas/`, {
+        method: "GET",
+        headers: getHeaders(),
+      });
+    } catch {
+      throw new Error(`Não foi possível conectar ao servidor em ${apiBaseUrl}.`);
+    }
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        await handleUnauthorized();
+        throw new Error("Sessão mobile não autenticada.");
+      }
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.message || `Erro HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    return Array.isArray(data) ? data : data.results || [];
+  },
+
+  createFarm: async (data: Partial<MobileFarm>): Promise<MobileFarm> => {
+    let res: Response;
+    try {
+      res = await fetch(`${apiBaseUrl}/pivots/fazendas/`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      });
+    } catch {
+      throw new Error(`Não foi possível conectar ao servidor em ${apiBaseUrl}.`);
+    }
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        await handleUnauthorized();
+        throw new Error("Sessão mobile não autenticada.");
+      }
+      const err = await res.json().catch(() => ({}));
+      const msg = err.detail || err.message || (typeof err === "object" ? Object.values(err).flat().join(" ") : "") || `Erro HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    return res.json();
+  },
+
+  updateFarm: async (id: string, data: Partial<MobileFarm>): Promise<MobileFarm> => {
+    let res: Response;
+    try {
+      res = await fetch(`${apiBaseUrl}/pivots/fazendas/${id}/`, {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      });
+    } catch {
+      throw new Error(`Não foi possível conectar ao servidor em ${apiBaseUrl}.`);
+    }
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        await handleUnauthorized();
+        throw new Error("Sessão mobile não autenticada.");
+      }
+      const err = await res.json().catch(() => ({}));
+      const msg = err.detail || err.message || (typeof err === "object" ? Object.values(err).flat().join(" ") : "") || `Erro HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    return res.json();
+  },
+
+  deleteFarm: async (id: string): Promise<void> => {
+    let res: Response;
+    try {
+      res = await fetch(`${apiBaseUrl}/pivots/fazendas/${id}/`, {
+        method: "DELETE",
+        headers: getHeaders(),
+      });
+    } catch {
+      throw new Error(`Não foi possível conectar ao servidor em ${apiBaseUrl}.`);
+    }
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        await handleUnauthorized();
+        throw new Error("Sessão mobile não autenticada.");
+      }
+      const err = await res.json().catch(() => ({}));
+      const msg = err.detail || err.message || (typeof err === "object" ? Object.values(err).flat().join(" ") : "") || `Erro HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+  },
+
+  // --- TALHÕES ---
+  getFields: async (filters?: { fazenda?: string }): Promise<MobileField[]> => {
+    let res: Response;
+    const query = new URLSearchParams();
+    if (filters?.fazenda) query.set("fazenda", filters.fazenda);
+    const qs = query.toString() ? `?${query.toString()}` : "";
+
+    try {
+      res = await fetch(`${apiBaseUrl}/pivots/talhoes/${qs}`, {
+        method: "GET",
+        headers: getHeaders(),
+      });
+    } catch {
+      throw new Error(`Não foi possível conectar ao servidor em ${apiBaseUrl}.`);
+    }
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        await handleUnauthorized();
+        throw new Error("Sessão mobile não autenticada.");
+      }
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.detail || err.message || `Erro HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    return Array.isArray(data) ? data : data.results || [];
+  },
+
+  createField: async (data: Partial<MobileField>): Promise<MobileField> => {
+    let res: Response;
+    try {
+      res = await fetch(`${apiBaseUrl}/pivots/talhoes/`, {
+        method: "POST",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      });
+    } catch {
+      throw new Error(`Não foi possível conectar ao servidor em ${apiBaseUrl}.`);
+    }
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        await handleUnauthorized();
+        throw new Error("Sessão mobile não autenticada.");
+      }
+      const err = await res.json().catch(() => ({}));
+      const msg = err.detail || err.message || (typeof err === "object" ? Object.values(err).flat().join(" ") : "") || `Erro HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    return res.json();
+  },
+
+  updateField: async (id: string, data: Partial<MobileField>): Promise<MobileField> => {
+    let res: Response;
+    try {
+      res = await fetch(`${apiBaseUrl}/pivots/talhoes/${id}/`, {
+        method: "PATCH",
+        headers: getHeaders(),
+        body: JSON.stringify(data),
+      });
+    } catch {
+      throw new Error(`Não foi possível conectar ao servidor em ${apiBaseUrl}.`);
+    }
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        await handleUnauthorized();
+        throw new Error("Sessão mobile não autenticada.");
+      }
+      const err = await res.json().catch(() => ({}));
+      const msg = err.detail || err.message || (typeof err === "object" ? Object.values(err).flat().join(" ") : "") || `Erro HTTP ${res.status}`;
+      throw new Error(msg);
+    }
+    return res.json();
+  },
+
+  deleteField: async (id: string): Promise<void> => {
+    let res: Response;
+    try {
+      res = await fetch(`${apiBaseUrl}/pivots/talhoes/${id}/`, {
+        method: "DELETE",
+        headers: getHeaders(),
+      });
+    } catch {
+      throw new Error(`Não foi possível conectar ao servidor em ${apiBaseUrl}.`);
+    }
+
+    if (!res.ok) {
+      if (res.status === 401) {
+        await handleUnauthorized();
+        throw new Error("Sessão mobile não autenticada.");
+      }
+      const err = await res.json().catch(() => ({}));
+      const msg = err.detail || err.message || (typeof err === "object" ? Object.values(err).flat().join(" ") : "") || `Erro HTTP ${res.status}`;
+      throw new Error(msg);
+    }
   },
 };

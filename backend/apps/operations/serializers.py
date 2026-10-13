@@ -2,45 +2,74 @@ from decimal import Decimal
 from rest_framework import serializers
 from drf_spectacular.utils import extend_schema_field
 from .models import Cultura, Safra, PlanoOperacional, RegistroIrrigacao, Alerta, JanelaOportunidade
-from .services import validar_transicao_status
+from .services import validar_transicao_status, validar_sobreposicao_plano
 
 class CulturaSerializer(serializers.ModelSerializer):
+    fazenda_nome = serializers.ReadOnlyField(source="fazenda.nome")
+    fazenda_filial = serializers.ReadOnlyField(source="fazenda.filial")
+
     class Meta:
         model = Cultura
         fields = [
             "id",
-            "nome",
-            "codigo",
-            "variedade",
+            "fazenda",
+            "fazenda_nome",
+            "fazenda_filial",
             "descricao",
-            "dias_ciclo_estimado",
-            "coeficiente_kc_padrao",
-            "ativo",
-            "observacoes",
+            "id_pims",
             "criado_em",
             "atualizado_em",
         ]
+        extra_kwargs = {
+            "fazenda": {"required": False, "allow_null": True},
+            "id_pims": {"required": False, "allow_blank": True},
+        }
 
-    def validate_nome(self, value):
-        val = value.strip()
-        if not val:
-            raise serializers.ValidationError("O nome da cultura é obrigatório.")
-        qs = Cultura.objects.filter(nome__iexact=val)
+    def validate(self, attrs):
+        # 1. Descrição completa da cultura obrigatória
+        descricao = attrs.get("descricao")
+        if descricao:
+            descricao = descricao.strip().upper()
+        elif self.instance:
+            descricao = self.instance.descricao
+
+        if not descricao:
+            raise serializers.ValidationError({
+                "descricao": "A descrição completa da cultura é obrigatória."
+            })
+
+        attrs["descricao"] = descricao
+
+        # 2. Vínculo de Fazenda (opcional/geral)
+        fazenda = attrs.get("fazenda") or getattr(self.instance, "fazenda", None)
+
+        # Validar duplicidade de descrição
+        qs = Cultura.objects.filter(descricao__iexact=descricao)
+        if fazenda:
+            qs = qs.filter(fazenda=fazenda)
         if self.instance:
             qs = qs.exclude(id=self.instance.id)
         if qs.exists():
-            raise serializers.ValidationError("Já existe uma cultura cadastrada com este nome.")
-        return val
+            raise serializers.ValidationError({
+                "descricao": f"Já existe uma cultura cadastrada com a descrição '{descricao}'."
+            })
 
-    def validate_codigo(self, value):
-        val = value.strip().upper() if value else ""
-        if val:
-            qs = Cultura.objects.filter(codigo__iexact=val)
-            if self.instance:
-                qs = qs.exclude(id=self.instance.id)
-            if qs.exists():
-                raise serializers.ValidationError("Já existe uma cultura com este código identificador.")
-        return val
+        # 3. ID do PIMS (Opcional, porém estritamente único quando informado)
+        id_pims = attrs.get("id_pims")
+        if id_pims is not None:
+            id_pims = str(id_pims).strip()
+            attrs["id_pims"] = id_pims
+            if id_pims:
+                qs_pims = Cultura.objects.filter(id_pims__iexact=id_pims)
+                if self.instance:
+                    qs_pims = qs_pims.exclude(id=self.instance.id)
+                if qs_pims.exists():
+                    conflito = qs_pims.first()
+                    raise serializers.ValidationError({
+                        "id_pims": f"Já existe uma cultura cadastrada com o ID PIMS '{id_pims}' ({conflito.descricao})."
+                    })
+
+        return attrs
 
 class SafraSerializer(serializers.ModelSerializer):
     fazenda_nome = serializers.ReadOnlyField(source="fazenda.nome")
@@ -95,6 +124,7 @@ class PlanoOperacionalSerializer(serializers.ModelSerializer):
     pivo_nome = serializers.ReadOnlyField(source="pivo.nome")
     pivo_area_irrigada_ha = serializers.ReadOnlyField(source="pivo.area_irrigada_ha")
     status_display = serializers.CharField(source="get_status_display", read_only=True)
+    autorizado_por_nome = serializers.SerializerMethodField()
 
     class Meta:
         model = PlanoOperacional
@@ -118,19 +148,39 @@ class PlanoOperacionalSerializer(serializers.ModelSerializer):
             "pivo_area_irrigada_ha",
             "data_plantio",
             "data_colheita_prevista",
+            "data_plantio_real",
+            "data_colheita_real",
             "area_planejada_ha",
             "lamina_total_planejada_mm",
             "lamina_acumulada_realizada_mm",
             "status",
             "status_display",
+            "permite_sobreposicao",
+            "justificativa_sobreposicao",
+            "autorizado_por",
+            "autorizado_por_nome",
             "observacoes",
             "criado_em",
             "atualizado_em",
         ]
+        extra_kwargs = {
+            "data_plantio_real": {"required": False, "allow_null": True},
+            "data_colheita_real": {"required": False, "allow_null": True},
+            "permite_sobreposicao": {"required": False},
+            "justificativa_sobreposicao": {"required": False, "allow_blank": True},
+            "autorizado_por": {"read_only": True},
+        }
+
+    @extend_schema_field(serializers.CharField)
+    def get_autorizado_por_nome(self, obj):
+        return obj.autorizado_por.get_full_name() or obj.autorizado_por.username if obj.autorizado_por else None
 
     def validate(self, attrs):
         data_plantio = attrs.get("data_plantio") if "data_plantio" in attrs else (self.instance.data_plantio if self.instance else None)
         data_colheita = attrs.get("data_colheita_prevista") if "data_colheita_prevista" in attrs else (self.instance.data_colheita_prevista if self.instance else None)
+        data_plantio_real = attrs.get("data_plantio_real") if "data_plantio_real" in attrs else (self.instance.data_plantio_real if self.instance else None)
+        data_colheita_real = attrs.get("data_colheita_real") if "data_colheita_real" in attrs else (self.instance.data_colheita_real if self.instance else None)
+
         if "area_planejada_ha" in attrs:
             area_ha = attrs["area_planejada_ha"]
         elif self.instance:
@@ -138,10 +188,16 @@ class PlanoOperacionalSerializer(serializers.ModelSerializer):
         else:
             area_ha = None
 
-        # 1. Validação cronológica das datas
+        # 1. Validação cronológica das datas previstas
         if data_plantio and data_colheita and data_colheita < data_plantio:
             raise serializers.ValidationError({
                 "data_colheita_prevista": "A data de colheita prevista não pode ser anterior à data de plantio."
+            })
+
+        # 1.1. Validação cronológica das datas reais (quando ambas preenchidas)
+        if data_plantio_real and data_colheita_real and data_colheita_real < data_plantio_real:
+            raise serializers.ValidationError({
+                "data_colheita_real": "A data real de colheita não pode ser anterior à data real de plantio."
             })
 
         safra = attrs.get("safra") if "safra" in attrs else (self.instance.safra if self.instance else None)
@@ -215,10 +271,13 @@ class PlanoOperacionalSerializer(serializers.ModelSerializer):
                 })
 
         # 6. Validação de transição de status usando serviço compartilhado
+        user = self.context.get("request").user if self.context.get("request") else None
         if self.instance and "status" in attrs:
             novo = attrs["status"]
-            user = self.context.get("request").user if self.context.get("request") else None
             validar_transicao_status(self.instance, novo, user=user)
+
+        # 7. Identificação e validação de sobreposições na mesma unidade de área (Pivô ou Talhão)
+        validar_sobreposicao_plano(attrs, instance=self.instance, user=user)
 
         return attrs
 

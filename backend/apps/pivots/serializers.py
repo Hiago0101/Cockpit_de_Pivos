@@ -14,14 +14,148 @@ class FazendaSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Fazenda
-        fields = ["id", "empresa", "empresa_nome", "nome", "codigo", "municipio", "uf", "latitude", "longitude", "area_total_ha", "ativo", "pivos_count", "criado_em", "atualizado_em"]
+        fields = [
+            "id",
+            "empresa",
+            "empresa_nome",
+            "nome",
+            "codigo",
+            "filial",
+            "id_pims",
+            "municipio",
+            "uf",
+            "latitude",
+            "longitude",
+            "area_total_ha",
+            "ativo",
+            "pivos_count",
+            "criado_em",
+            "atualizado_em",
+        ]
+        extra_kwargs = {
+            "codigo": {"required": False, "allow_blank": True},
+            "filial": {"required": False, "allow_blank": True},
+            "id_pims": {"required": False, "allow_blank": True},
+            "municipio": {"required": False, "allow_blank": True},
+            "uf": {"required": False, "allow_blank": True},
+        }
+
+    def validate(self, attrs):
+        instance = getattr(self, "instance", None)
+
+        # 1. Validação e unicidade da Filial
+        filial = attrs.get("filial")
+        if filial is not None:
+            filial = str(filial).strip()
+            attrs["filial"] = filial
+            if filial:
+                if len(filial) != 6 or not filial.isdigit():
+                    raise serializers.ValidationError({
+                        "filial": "A filial deve conter exatamente 6 dígitos numéricos."
+                    })
+                qs_filial = Fazenda.objects.filter(filial__iexact=filial)
+                if instance:
+                    qs_filial = qs_filial.exclude(id=instance.id)
+                if qs_filial.exists():
+                    conflito = qs_filial.first()
+                    raise serializers.ValidationError({
+                        "filial": f"A Filial '{filial}' já está cadastrada na fazenda '{conflito.nome}'."
+                    })
+
+        # 2. Validação e unicidade do ID PIMS
+        id_pims = attrs.get("id_pims")
+        if id_pims is not None:
+            id_pims = str(id_pims).strip()
+            attrs["id_pims"] = id_pims
+            if id_pims:
+                qs_pims = Fazenda.objects.filter(id_pims__iexact=id_pims)
+                if instance:
+                    qs_pims = qs_pims.exclude(id=instance.id)
+                if qs_pims.exists():
+                    conflito = qs_pims.first()
+                    raise serializers.ValidationError({
+                        "id_pims": f"O ID PIMS '{id_pims}' já está cadastrado na fazenda '{conflito.nome}'."
+                    })
+
+        # 3. Forçar nome em maiúsculo
+        nome = attrs.get("nome")
+        if nome:
+            attrs["nome"] = nome.strip().upper()
+
+        return attrs
 
 class TalhaoSerializer(serializers.ModelSerializer):
     fazenda_nome = serializers.ReadOnlyField(source="fazenda.nome")
+    fazenda_filial = serializers.ReadOnlyField(source="fazenda.filial")
 
     class Meta:
         model = Talhao
-        fields = ["id", "fazenda", "fazenda_nome", "codigo", "nome", "area_ha", "ativo", "criado_em", "atualizado_em"]
+        fields = [
+            "id",
+            "fazenda",
+            "fazenda_nome",
+            "fazenda_filial",
+            "codigo",
+            "nome",
+            "descricao",
+            "id_pims",
+            "area_ha",
+            "ativo",
+            "criado_em",
+            "atualizado_em",
+        ]
+        extra_kwargs = {
+            "nome": {"required": False, "allow_blank": True},
+            "descricao": {"required": False, "allow_blank": True},
+            "id_pims": {"required": False, "allow_blank": True},
+            "area_ha": {"required": False},
+        }
+
+    def validate(self, attrs):
+        # 1. Fazenda validation
+        fazenda = attrs.get("fazenda") or getattr(self.instance, "fazenda", None)
+        if not fazenda:
+            raise serializers.ValidationError({"fazenda": "A fazenda vinculada é obrigatória."})
+
+        # 2. Código validation & uppercase
+        codigo = attrs.get("codigo")
+        if codigo:
+            codigo = codigo.strip().upper()
+            attrs["codigo"] = codigo
+
+            # Verificar se código já existe na fazenda (unique_together fazenda + codigo)
+            qs = Talhao.objects.filter(fazenda=fazenda, codigo=codigo)
+            if self.instance:
+                qs = qs.exclude(id=self.instance.id)
+            if qs.exists():
+                raise serializers.ValidationError({
+                    "codigo": f"Já existe um talhão com o código '{codigo}' cadastrado nesta fazenda."
+                })
+        elif not self.instance:
+            raise serializers.ValidationError({"codigo": "O código do talhão é obrigatório."})
+
+        # 3. Descrição / Nome
+        descricao = attrs.get("descricao")
+        nome = attrs.get("nome")
+        if descricao:
+            descricao = descricao.strip()
+            attrs["descricao"] = descricao
+            if not nome:
+                attrs["nome"] = descricao[:100]
+        elif nome:
+            nome = nome.strip()
+            attrs["nome"] = nome
+            if not descricao:
+                attrs["descricao"] = nome
+        elif not self.instance:
+            raise serializers.ValidationError({"descricao": "A descrição do talhão é obrigatória."})
+
+        # 4. ID PIMS (Opcional)
+        id_pims = attrs.get("id_pims")
+        if id_pims is not None:
+            attrs["id_pims"] = str(id_pims).strip()
+
+        return attrs
 
 class PivoSerializer(serializers.ModelSerializer):
     fazenda_nome = serializers.ReadOnlyField(source="fazenda.nome")

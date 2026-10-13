@@ -27,18 +27,22 @@ export interface MobilePivot {
 export interface MobileFarm {
   id: string;
   nome: string;
-  codigo: string;
-  municipio: string;
-  uf: string;
+  codigo?: string;
+  filial?: string;
+  id_pims?: string;
+  municipio?: string;
+  uf?: string;
+  area_total_ha?: number;
+  ativo?: boolean;
 }
 
 export interface MobileCrop {
   id: string;
-  nome: string;
-  codigo?: string | null;
-  dias_ciclo_estimado?: number;
-  consumo_hidrico_fase?: Record<string, number>;
-  ativo: boolean;
+  descricao: string;
+  fazenda?: string | null;
+  fazenda_nome?: string;
+  fazenda_filial?: string;
+  id_pims?: string;
 }
 
 export interface MobileSeason {
@@ -55,11 +59,14 @@ export interface MobileSeason {
 export interface MobileField {
   id: string;
   fazenda: string;
-  fazenda_nome: string;
+  fazenda_nome?: string;
+  fazenda_filial?: string;
   codigo: string;
-  nome: string;
-  area_ha: number;
-  ativo: boolean;
+  nome?: string;
+  descricao?: string;
+  id_pims?: string;
+  area_ha?: number;
+  ativo?: boolean;
 }
 
 export type CropPlanStatus = "RASCUNHO" | "PLANEJADO" | "EM_ANDAMENTO" | "CONCLUIDO" | "CANCELADO";
@@ -80,9 +87,13 @@ export interface MobileCropPlan {
   alvo_nome: string;
   data_plantio: string;
   data_colheita_prevista: string;
+  data_plantio_real?: string | null;
+  data_colheita_real?: string | null;
   area_planejada_ha: number;
   status: CropPlanStatus;
   status_display: string;
+  permite_sobreposicao?: boolean;
+  justificativa_sobreposicao?: string;
   observacoes?: string;
   atualizado_em?: string;
 }

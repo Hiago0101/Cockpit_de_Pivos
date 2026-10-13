@@ -1,20 +1,16 @@
-import React, { useState, useEffect } from "react";
-import {
-  api,
-  type Crop,
-} from "@/services/api";
+import { useState, useEffect } from "react";
+import { api, type Crop, type Farm } from "@/services/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
   DialogDescription,
   DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import {
   Sprout,
@@ -22,40 +18,39 @@ import {
   Search,
   RefreshCw,
   Edit,
-  CheckCircle,
-  XCircle,
   AlertCircle,
+  Copy,
+  Check,
 } from "lucide-react";
+import { toast } from "sonner";
 
 export function CropCatalogView() {
   const [crops, setCrops] = useState<Crop[]>([]);
+  const [farms, setFarms] = useState<Farm[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterAtivo, setFilterAtivo] = useState<string>("all");
+  const [selectedFarmFilter, setSelectedFarmFilter] = useState<string>("ALL");
 
   const [modalOpen, setModalOpen] = useState(false);
   const [cropToEdit, setCropToEdit] = useState<Crop | null>(null);
   const [formData, setFormData] = useState({
-    nome: "",
-    codigo: "",
-    variedade: "",
+    fazenda: "",
     descricao: "",
-    dias_ciclo_estimado: 120,
-    coeficiente_kc_padrao: "1.15",
-    ativo: true,
-    observacoes: "",
+    id_pims: "",
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  const loadCrops = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      const data = await api.getCrops({
-        search: search || undefined,
-        ativo: filterAtivo === "all" ? undefined : filterAtivo === "true",
-      });
-      setCrops(data);
+      const [cropsData, farmsData] = await Promise.all([
+        api.getCrops(),
+        api.getFarms(),
+      ]);
+      setCrops(cropsData);
+      setFarms(farmsData);
     } catch {
       setCrops([]);
     } finally {
@@ -64,20 +59,15 @@ export function CropCatalogView() {
   };
 
   useEffect(() => {
-    loadCrops();
-  }, [search, filterAtivo]);
+    loadData();
+  }, []);
 
   const handleOpenCreate = () => {
     setCropToEdit(null);
     setFormData({
-      nome: "",
-      codigo: "",
-      variedade: "",
+      fazenda: selectedFarmFilter !== "ALL" ? selectedFarmFilter : "",
       descricao: "",
-      dias_ciclo_estimado: 120,
-      coeficiente_kc_padrao: "1.15",
-      ativo: true,
-      observacoes: "",
+      id_pims: "",
     });
     setError(null);
     setModalOpen(true);
@@ -86,172 +76,228 @@ export function CropCatalogView() {
   const handleOpenEdit = (crop: Crop) => {
     setCropToEdit(crop);
     setFormData({
-      nome: crop.nome,
-      codigo: crop.codigo || "",
-      variedade: crop.variedade || "",
+      fazenda: crop.fazenda || "",
       descricao: crop.descricao || "",
-      dias_ciclo_estimado: crop.dias_ciclo_estimado || 120,
-      coeficiente_kc_padrao: String(crop.coeficiente_kc_padrao || "1.15"),
-      ativo: crop.ativo,
-      observacoes: crop.observacoes || "",
+      id_pims: crop.id_pims || "",
     });
     setError(null);
     setModalOpen(true);
   };
 
+  const handleCopyId = (id: string) => {
+    navigator.clipboard.writeText(id);
+    setCopiedId(id);
+    toast.info("ID copiado");
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.nome.trim()) {
-      setError("O nome da cultura é obrigatório.");
+    const cleanDescricao = formData.descricao.trim().toUpperCase();
+    if (!cleanDescricao) {
+      setError("A descrição completa da cultura é obrigatória.");
       return;
+    }
+
+    const cleanFazendaId = formData.fazenda.trim();
+    const cleanIdPims = formData.id_pims.trim();
+
+    if (!cleanFazendaId) {
+      setError("Selecione a fazenda / filial vinculada à cultura.");
+      return;
+    }
+
+    // Validação de duplicidade de descrição na listagem local
+    const duplicadaDesc = crops.find(
+      (c) =>
+        c.descricao?.trim().toUpperCase() === cleanDescricao &&
+        (!cleanFazendaId || !c.fazenda || c.fazenda === cleanFazendaId) &&
+        (!cropToEdit || c.id !== cropToEdit.id)
+    );
+    if (duplicadaDesc) {
+      setError(`Já existe uma cultura cadastrada com a descrição "${cleanDescricao}" nesta fazenda/filial.`);
+      return;
+    }
+
+    // Validação de duplicidade do ID PIMS na listagem local
+    if (cleanIdPims) {
+      const duplicadaPims = crops.find(
+        (c) =>
+          c.id_pims?.trim().toUpperCase() === cleanIdPims.toUpperCase() &&
+          (!cropToEdit || c.id !== cropToEdit.id)
+      );
+      if (duplicadaPims) {
+        setError(
+          `Já existe uma cultura cadastrada com o ID PIMS "${cleanIdPims}" (${duplicadaPims.descricao}).`
+        );
+        return;
+      }
     }
 
     setSubmitting(true);
     setError(null);
 
     const payload: Partial<Crop> = {
-      nome: formData.nome.trim(),
-      codigo: formData.codigo.trim().toUpperCase(),
-      variedade: formData.variedade.trim(),
-      descricao: formData.descricao.trim(),
-      dias_ciclo_estimado: Number(formData.dias_ciclo_estimado),
-      coeficiente_kc_padrao: Number(formData.coeficiente_kc_padrao),
-      ativo: formData.ativo,
-      observacoes: formData.observacoes.trim(),
+      descricao: cleanDescricao,
+      fazenda: cleanFazendaId || null,
+      id_pims: cleanIdPims || "",
     };
 
     try {
       if (cropToEdit) {
         await api.updateCrop(cropToEdit.id, payload);
+        toast.success(`Cultura "${cleanDescricao}" atualizada com sucesso!`);
       } else {
         await api.createCrop(payload);
+        toast.success(`Cultura "${cleanDescricao}" cadastrada com sucesso!`);
       }
       setModalOpen(false);
-      loadCrops();
+      loadData();
     } catch (err: any) {
-      setError(err.message || "Erro ao salvar cultura.");
+      setError(err?.message || "Erro ao salvar cultura.");
     } finally {
       setSubmitting(false);
     }
   };
 
+  const filteredCrops = crops.filter((crop) => {
+    if (selectedFarmFilter !== "ALL" && crop.fazenda !== selectedFarmFilter) {
+      return false;
+    }
+    const term = search.toLowerCase();
+    const matchesDescricao = (crop.descricao || "").toLowerCase().includes(term);
+    const matchesId = (crop.id || "").toLowerCase().includes(term);
+    const matchesPims = (crop.id_pims || "").toLowerCase().includes(term);
+    const matchesFazendaNome = (crop.fazenda_nome || "").toLowerCase().includes(term);
+    const matchesFazendaFilial = (crop.fazenda_filial || "").toLowerCase().includes(term);
+
+    return (
+      matchesDescricao ||
+      matchesId ||
+      matchesPims ||
+      matchesFazendaNome ||
+      matchesFazendaFilial
+    );
+  });
+
   return (
     <div className="space-y-4">
-      {/* Header com Busca e Ação */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border border-border bg-card p-4 shadow-sm">
-        <div className="flex items-center gap-2">
-          <div className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
-            <Sprout className="size-4" />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-foreground">
-              Catálogo de Culturas Agrícolas
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Cadastro e parâmetros agronômicos de cultivares, ciclo e coeficiente Kc
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
+      {/* Header com Busca e Filtros fora do card */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border bg-card p-4 shadow-sm">
+        <div className="flex flex-1 flex-col sm:flex-row items-center gap-2.5 max-w-2xl">
+          <div className="relative w-full">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
             <Input
-              type="text"
-              placeholder="Buscar cultura, código ou variedade..."
+              placeholder="Buscar por descrição, fazenda ou ID PIMS..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="h-8 pl-8 text-xs w-[220px]"
+              className="h-9 pl-8 text-xs bg-background"
             />
           </div>
 
-          <select
-            className="h-8 rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-            value={filterAtivo}
-            onChange={(e) => setFilterAtivo(e.target.value)}
-          >
-            <option value="all">Todas</option>
-            <option value="true">Apenas Ativas</option>
-            <option value="false">Inativas</option>
-          </select>
+          {farms.length > 0 && (
+            <div className="relative w-full sm:w-60 shrink-0">
+              <select
+                aria-label="Filtrar por Fazenda / Filial"
+                className="h-9 w-full rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
+                value={selectedFarmFilter}
+                onChange={(e) => setSelectedFarmFilter(e.target.value)}
+              >
+                <option value="ALL">Todas as Fazendas ({farms.length})</option>
+                {farms.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nome} {f.filial ? `(Filial ${f.filial})` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
 
-          <Button size="sm" onClick={handleOpenCreate} className="h-8 gap-1.5 text-xs">
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadData}
+            disabled={loading}
+            className="h-9 text-xs gap-1.5"
+          >
+            <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+            Atualizar
+          </Button>
+
+          <Button
+            size="sm"
+            onClick={handleOpenCreate}
+            className="h-9 text-xs gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
+          >
             <Plus className="size-3.5" />
             Nova Cultura
           </Button>
         </div>
       </div>
 
-      {/* Grid de Cards de Culturas */}
-      {loading ? (
-        <div className="py-16 text-center text-xs text-muted-foreground">
+      {/* Lista de Culturas */}
+      {loading && crops.length === 0 ? (
+        <div className="flex items-center justify-center py-12 text-sm text-muted-foreground">
+          <RefreshCw className="size-4 animate-spin mr-2" />
           Carregando catálogo de culturas...
         </div>
-      ) : crops.length === 0 ? (
-        <div className="rounded-xl border border-border bg-card py-16 text-center text-xs text-muted-foreground space-y-2">
-          <p className="font-semibold text-foreground">Nenhuma cultura agrícola encontrada.</p>
-          <Button size="sm" variant="outline" onClick={handleOpenCreate} className="gap-1.5 text-xs">
-            <Plus className="size-3.5" />
-            Cadastrar Primeira Cultura
-          </Button>
+      ) : filteredCrops.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-border bg-muted/20 p-8 text-center">
+          <Sprout className="size-10 text-muted-foreground mx-auto mb-2 opacity-50" />
+          <p className="text-sm font-semibold text-foreground">Nenhuma cultura encontrada</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Cadastre novas culturas ou ajuste os filtros de pesquisa.
+          </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {crops.map((c) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          {filteredCrops.map((c) => (
             <div
               key={c.id}
               className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-3 hover:border-primary/40 transition-colors"
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <h4 className="text-sm font-bold text-foreground flex items-center gap-1.5">
-                    {c.nome}
-                    {c.codigo && (
-                      <Badge variant="secondary" className="text-[10px] uppercase font-mono px-1.5 py-0">
-                        {c.codigo}
+                  <h4 className="text-sm font-bold text-foreground flex items-center gap-1.5 uppercase">
+                    {c.descricao}
+                  </h4>
+                  <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                    {c.fazenda_nome && (
+                      <span className="text-xs text-muted-foreground">
+                        {c.fazenda_nome} {c.fazenda_filial ? `(Filial ${c.fazenda_filial})` : ""}
+                      </span>
+                    )}
+                    {c.id_pims && (
+                      <Badge variant="outline" className="text-[10px] font-mono px-1.5 py-0 bg-primary/5 text-primary border-primary/20">
+                        PIMS: {c.id_pims}
                       </Badge>
                     )}
-                  </h4>
-                  {c.variedade && (
-                    <p className="text-xs text-muted-foreground">Variedade: {c.variedade}</p>
-                  )}
+                  </div>
                 </div>
+              </div>
 
-                <Badge
-                  variant="outline"
-                  className={`text-[10px] px-1.5 py-0 ${
-                    c.ativo
-                      ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
-                      : "border-slate-500/30 bg-slate-500/10 text-slate-500"
-                  }`}
+              <div className="flex items-center justify-between pt-2 border-t border-border/50 text-[11px] text-muted-foreground">
+                <button
+                  type="button"
+                  onClick={() => handleCopyId(c.id)}
+                  className="flex items-center gap-1 hover:text-foreground font-mono truncate max-w-[160px] cursor-pointer"
+                  title="Copiar ID do Sistema"
                 >
-                  {c.ativo ? "Ativa" : "Inativa"}
-                </Badge>
-              </div>
+                  {copiedId === c.id ? (
+                    <Check className="size-3 text-emerald-500" />
+                  ) : (
+                    <Copy className="size-3" />
+                  )}
+                  <span className="truncate">{c.id}</span>
+                </button>
 
-              {c.descricao && (
-                <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
-                  {c.descricao}
-                </p>
-              )}
-
-              <div className="grid grid-cols-2 gap-2 rounded-lg bg-muted/40 p-2 text-xs">
-                <div>
-                  <span className="text-[10px] text-muted-foreground block">Ciclo Estimado:</span>
-                  <span className="font-semibold text-foreground">{c.dias_ciclo_estimado} dias</span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-muted-foreground block">Kc Padrão:</span>
-                  <span className="font-semibold text-foreground">{c.coeficiente_kc_padrao}</span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-end pt-1">
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => handleOpenEdit(c)}
-                  className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground"
+                  className="h-7 text-xs gap-1 text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   <Edit className="size-3" />
                   Editar
@@ -268,10 +314,10 @@ export function CropCatalogView() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-foreground text-base">
               <Sprout className="size-4 text-primary" />
-              {cropToEdit ? "Editar Cultura Agrícola" : "Cadastrar Nova Cultura"}
+              {cropToEdit ? "Editar Cultura" : "Cadastrar Nova Cultura"}
             </DialogTitle>
             <DialogDescription className="text-xs">
-              Informe os dados agronômicos básicos para planejamento temporal e irrigação.
+              Mantenha o cadastro com a descrição e vínculos de fazenda/filial e PIMS.
             </DialogDescription>
           </DialogHeader>
 
@@ -283,111 +329,61 @@ export function CropCatalogView() {
               </div>
             )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="crop-nome" className="text-xs font-semibold">
-                  Nome da Cultura *
-                </Label>
-                <Input
-                  id="crop-nome"
-                  placeholder="Ex: Soja, Milho, Feijão"
-                  value={formData.nome}
-                  onChange={(e) => setFormData({ ...formData, nome: e.target.value })}
-                  className="h-8 text-xs"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="crop-codigo" className="text-xs font-semibold">
-                  Código Interno
-                </Label>
-                <Input
-                  id="crop-codigo"
-                  placeholder="Ex: SOJ-01, MIL-02"
-                  value={formData.codigo}
-                  onChange={(e) => setFormData({ ...formData, codigo: e.target.value })}
-                  className="h-8 text-xs uppercase"
-                />
-              </div>
-            </div>
-
+            {/* Fazenda / Filial */}
             <div className="space-y-1">
-              <Label htmlFor="crop-variedade" className="text-xs font-semibold">
-                Variedade / Cultivar
+              <Label htmlFor="crop-fazenda" className="text-xs font-semibold">
+                Fazenda / Filial *
               </Label>
-              <Input
-                id="crop-variedade"
-                placeholder="Ex: TMG 7062 IPRO, P3707 VYHR"
-                value={formData.variedade}
-                onChange={(e) => setFormData({ ...formData, variedade: e.target.value })}
-                className="h-8 text-xs"
-              />
+              <select
+                id="crop-fazenda"
+                value={formData.fazenda}
+                onChange={(e) => setFormData({ ...formData, fazenda: e.target.value })}
+                required
+                className="w-full h-8 rounded-md border border-input bg-background px-2.5 text-xs text-foreground cursor-pointer"
+              >
+                <option value="">Selecione a fazenda...</option>
+                {farms.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nome} {f.filial ? `(Filial ${f.filial})` : ""}
+                  </option>
+                ))}
+              </select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="crop-ciclo" className="text-xs font-semibold">
-                  Ciclo Médio (Dias)
-                </Label>
-                <Input
-                  id="crop-ciclo"
-                  type="number"
-                  min="1"
-                  value={formData.dias_ciclo_estimado}
-                  onChange={(e) => setFormData({ ...formData, dias_ciclo_estimado: Number(e.target.value) })}
-                  className="h-8 text-xs"
-                />
-              </div>
-
-              <div className="space-y-1">
-                <Label htmlFor="crop-kc" className="text-xs font-semibold">
-                  Kc Padrão (Evapotranspiração)
-                </Label>
-                <Input
-                  id="crop-kc"
-                  type="number"
-                  step="0.01"
-                  min="0.1"
-                  value={formData.coeficiente_kc_padrao}
-                  onChange={(e) => setFormData({ ...formData, coeficiente_kc_padrao: e.target.value })}
-                  className="h-8 text-xs"
-                />
-              </div>
-            </div>
-
+            {/* Descrição Completa */}
             <div className="space-y-1">
               <Label htmlFor="crop-desc" className="text-xs font-semibold">
-                Descrição
+                Descrição Completa da Cultura *
               </Label>
-              <Textarea
+              <Input
                 id="crop-desc"
-                placeholder="Características fenológicas e exigências hídricas..."
+                placeholder="Ex: SOJA, MILHO SAFRINHA, ALGODÃO"
                 value={formData.descricao}
-                onChange={(e) => setFormData({ ...formData, descricao: e.target.value })}
-                rows={2}
-                className="text-xs resize-none"
+                onChange={(e) => setFormData({ ...formData, descricao: e.target.value.toUpperCase() })}
+                className="h-8 text-xs uppercase font-medium"
+                required
               />
             </div>
 
-            <div className="flex items-center gap-2 pt-1">
-              <input
-                id="crop-ativo"
-                type="checkbox"
-                checked={formData.ativo}
-                onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
-                className="size-3.5 rounded border-input"
-              />
-              <Label htmlFor="crop-ativo" className="text-xs font-medium cursor-pointer">
-                Cultura ativa para novos planejamentos
+            {/* ID do PIMS */}
+            <div className="space-y-1">
+              <Label htmlFor="crop-pims" className="text-xs font-semibold">
+                ID do PIMS (Opcional)
               </Label>
+              <Input
+                id="crop-pims"
+                placeholder="Ex: 1040, CULT-PIMS-01"
+                value={formData.id_pims}
+                onChange={(e) => setFormData({ ...formData, id_pims: e.target.value })}
+                className="h-8 text-xs font-mono"
+              />
             </div>
 
             <DialogFooter className="gap-2 sm:gap-0 pt-2">
               <Button variant="outline" size="sm" type="button" onClick={() => setModalOpen(false)}>
                 Cancelar
               </Button>
-              <Button size="sm" type="submit" disabled={submitting}>
+              <Button size="sm" type="submit" disabled={submitting} className="bg-primary text-primary-foreground hover:bg-primary/90">
                 {submitting ? "Gravando..." : "Salvar Cultura"}
               </Button>
             </DialogFooter>
