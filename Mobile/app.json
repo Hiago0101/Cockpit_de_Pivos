@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "Cockpit de Pivôs",
+    "slug": "cockpit-de-pivos",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#132a22"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#132a22"
+      }
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-sqlite"
+    ]
+  }
+}

@@ -1,0 +1,11 @@
+# Backend Python / Django Dependencies (Matriz Homologada)
+Django>=5.1.0,<5.2.0
+djangorestframework==3.15.2
+django-cors-headers>=4.5.0
+drf-spectacular>=0.28.0
+python-dotenv>=1.0.1
+
+# Microsoft SQL Server Connectivity (On-Premises)
+# mssql-django 1.8.0 com pyodbc 5.3.0 homologados para Django 5.1.x
+pyodbc>=5.2.0,<6.0.0
+mssql-django==1.8.0

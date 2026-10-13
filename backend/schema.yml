@@ -1,0 +1,3155 @@
+openapi: 3.0.3
+info:
+  title: Cockpit de Pivôs — API Central
+  version: 1.0.0
+  description: API de gestão agrícola, planejamento de safras, telemetria de pivôs
+    centrais e sincronização offline mobile.
+paths:
+  /api/v1/core/audit-logs/:
+    get:
+      operationId: v1_core_audit_logs_list
+      description: Trilha de auditoria das operações executadas no sistema.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAuditLogList'
+          description: ''
+  /api/v1/core/audit-logs/{id}/:
+    get:
+      operationId: v1_core_audit_logs_retrieve
+      description: Trilha de auditoria das operações executadas no sistema.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Registro de Auditoria.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLog'
+          description: ''
+  /api/v1/core/auth/login/:
+    post:
+      operationId: v1_core_auth_login_create
+      description: Autenticação de usuários corporativos com retorno de token de sessão.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/v1/core/auth/me/:
+    get:
+      operationId: v1_core_auth_me_retrieve
+      description: Retorna dados do usuário atualmente autenticado.
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+          description: ''
+  /api/v1/operations/alertas/:
+    get:
+      operationId: v1_operations_alertas_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedAlertaList'
+          description: ''
+    post:
+      operationId: v1_operations_alertas_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Alerta'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Alerta'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Alerta'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alerta'
+          description: ''
+  /api/v1/operations/alertas/{id}/:
+    get:
+      operationId: v1_operations_alertas_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Alerta Operacional.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alerta'
+          description: ''
+    put:
+      operationId: v1_operations_alertas_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Alerta Operacional.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Alerta'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Alerta'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Alerta'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alerta'
+          description: ''
+    patch:
+      operationId: v1_operations_alertas_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Alerta Operacional.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedAlerta'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedAlerta'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedAlerta'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alerta'
+          description: ''
+    delete:
+      operationId: v1_operations_alertas_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Alerta Operacional.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/v1/operations/alertas/{id}/reconhecer/:
+    post:
+      operationId: v1_operations_alertas_reconhecer_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Alerta Operacional.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Alerta'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Alerta'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Alerta'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alerta'
+          description: ''
+  /api/v1/operations/alertas/{id}/resolver/:
+    post:
+      operationId: v1_operations_alertas_resolver_create
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Alerta Operacional.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Alerta'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Alerta'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Alerta'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alerta'
+          description: ''
+  /api/v1/operations/cockpit-resumo/:
+    get:
+      operationId: v1_operations_cockpit_resumo_retrieve
+      description: Endpoint consolidado de indicadores operacionais para o Cockpit
+        (Web e Mobile).
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+                description: Unspecified response body
+          description: ''
+  /api/v1/operations/culturas/:
+    get:
+      operationId: v1_operations_culturas_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedCulturaList'
+          description: ''
+    post:
+      operationId: v1_operations_culturas_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Cultura'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Cultura'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Cultura'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cultura'
+          description: ''
+  /api/v1/operations/culturas/{id}/:
+    get:
+      operationId: v1_operations_culturas_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Cultura.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cultura'
+          description: ''
+    put:
+      operationId: v1_operations_culturas_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Cultura.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Cultura'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Cultura'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Cultura'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cultura'
+          description: ''
+    patch:
+      operationId: v1_operations_culturas_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Cultura.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedCultura'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedCultura'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedCultura'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cultura'
+          description: ''
+    delete:
+      operationId: v1_operations_culturas_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Cultura.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/v1/operations/irrigacoes/:
+    get:
+      operationId: v1_operations_irrigacoes_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedRegistroIrrigacaoList'
+          description: ''
+    post:
+      operationId: v1_operations_irrigacoes_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistroIrrigacao'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegistroIrrigacao'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegistroIrrigacao'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistroIrrigacao'
+          description: ''
+  /api/v1/operations/irrigacoes/{id}/:
+    get:
+      operationId: v1_operations_irrigacoes_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Registro de Irrigação.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistroIrrigacao'
+          description: ''
+    put:
+      operationId: v1_operations_irrigacoes_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Registro de Irrigação.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegistroIrrigacao'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/RegistroIrrigacao'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/RegistroIrrigacao'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistroIrrigacao'
+          description: ''
+    patch:
+      operationId: v1_operations_irrigacoes_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Registro de Irrigação.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedRegistroIrrigacao'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedRegistroIrrigacao'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedRegistroIrrigacao'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistroIrrigacao'
+          description: ''
+    delete:
+      operationId: v1_operations_irrigacoes_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Registro de Irrigação.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/v1/operations/janelas/:
+    get:
+      operationId: v1_operations_janelas_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedJanelaOportunidadeList'
+          description: ''
+    post:
+      operationId: v1_operations_janelas_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JanelaOportunidade'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/JanelaOportunidade'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/JanelaOportunidade'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JanelaOportunidade'
+          description: ''
+  /api/v1/operations/janelas/{id}/:
+    get:
+      operationId: v1_operations_janelas_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Janela de Oportunidade.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JanelaOportunidade'
+          description: ''
+    put:
+      operationId: v1_operations_janelas_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Janela de Oportunidade.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JanelaOportunidade'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/JanelaOportunidade'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/JanelaOportunidade'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JanelaOportunidade'
+          description: ''
+    patch:
+      operationId: v1_operations_janelas_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Janela de Oportunidade.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedJanelaOportunidade'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedJanelaOportunidade'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedJanelaOportunidade'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JanelaOportunidade'
+          description: ''
+    delete:
+      operationId: v1_operations_janelas_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Janela de Oportunidade.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/v1/operations/planos/:
+    get:
+      operationId: v1_operations_planos_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPlanoOperacionalList'
+          description: ''
+    post:
+      operationId: v1_operations_planos_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanoOperacional'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PlanoOperacional'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PlanoOperacional'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanoOperacional'
+          description: ''
+  /api/v1/operations/planos/{id}/:
+    get:
+      operationId: v1_operations_planos_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Plano Operacional.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanoOperacional'
+          description: ''
+    put:
+      operationId: v1_operations_planos_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Plano Operacional.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlanoOperacional'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PlanoOperacional'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PlanoOperacional'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanoOperacional'
+          description: ''
+    patch:
+      operationId: v1_operations_planos_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Plano Operacional.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPlanoOperacional'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPlanoOperacional'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPlanoOperacional'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlanoOperacional'
+          description: ''
+    delete:
+      operationId: v1_operations_planos_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Plano Operacional.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/v1/operations/safras/:
+    get:
+      operationId: v1_operations_safras_list
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedSafraList'
+          description: ''
+    post:
+      operationId: v1_operations_safras_create
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Safra'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Safra'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Safra'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Safra'
+          description: ''
+  /api/v1/operations/safras/{id}/:
+    get:
+      operationId: v1_operations_safras_retrieve
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Safra.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Safra'
+          description: ''
+    put:
+      operationId: v1_operations_safras_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Safra.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Safra'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Safra'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Safra'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Safra'
+          description: ''
+    patch:
+      operationId: v1_operations_safras_partial_update
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Safra.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedSafra'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedSafra'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedSafra'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Safra'
+          description: ''
+    delete:
+      operationId: v1_operations_safras_destroy
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Safra.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '204':
+          description: No response body
+  /api/v1/pivots/fazendas/:
+    get:
+      operationId: v1_pivots_fazendas_list
+      description: Gestão de Fazendas e Unidades Agrícolas.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedFazendaList'
+          description: ''
+    post:
+      operationId: v1_pivots_fazendas_create
+      description: Gestão de Fazendas e Unidades Agrícolas.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Fazenda'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Fazenda'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Fazenda'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fazenda'
+          description: ''
+  /api/v1/pivots/fazendas/{id}/:
+    get:
+      operationId: v1_pivots_fazendas_retrieve
+      description: Gestão de Fazendas e Unidades Agrícolas.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Fazenda.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fazenda'
+          description: ''
+    put:
+      operationId: v1_pivots_fazendas_update
+      description: Gestão de Fazendas e Unidades Agrícolas.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Fazenda.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Fazenda'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Fazenda'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Fazenda'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fazenda'
+          description: ''
+    patch:
+      operationId: v1_pivots_fazendas_partial_update
+      description: Gestão de Fazendas e Unidades Agrícolas.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Fazenda.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedFazenda'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedFazenda'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedFazenda'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Fazenda'
+          description: ''
+    delete:
+      operationId: v1_pivots_fazendas_destroy
+      description: Gestão de Fazendas e Unidades Agrícolas.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Fazenda.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/pivots/pivos/:
+    get:
+      operationId: v1_pivots_pivos_list
+      description: Cadastro, consulta, telemetria e operação de Pivôs Centrais.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedPivoList'
+          description: ''
+    post:
+      operationId: v1_pivots_pivos_create
+      description: Cadastro, consulta, telemetria e operação de Pivôs Centrais.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pivo'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Pivo'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Pivo'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pivo'
+          description: ''
+  /api/v1/pivots/pivos/{id}/:
+    get:
+      operationId: v1_pivots_pivos_retrieve
+      description: Cadastro, consulta, telemetria e operação de Pivôs Centrais.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Pivô Central.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pivo'
+          description: ''
+    put:
+      operationId: v1_pivots_pivos_update
+      description: Cadastro, consulta, telemetria e operação de Pivôs Centrais.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Pivô Central.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pivo'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Pivo'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Pivo'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pivo'
+          description: ''
+    patch:
+      operationId: v1_pivots_pivos_partial_update
+      description: Cadastro, consulta, telemetria e operação de Pivôs Centrais.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Pivô Central.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedPivo'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedPivo'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedPivo'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pivo'
+          description: ''
+    delete:
+      operationId: v1_pivots_pivos_destroy
+      description: Cadastro, consulta, telemetria e operação de Pivôs Centrais.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Pivô Central.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/pivots/pivos/{id}/comando-rapido/:
+    post:
+      operationId: v1_pivots_pivos_comando_rapido_create
+      description: Atualização de estado operacional do pivô (ligar, parar, mudar
+        percentímetro).
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Pivô Central.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pivo'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Pivo'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Pivo'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Pivo'
+          description: ''
+  /api/v1/pivots/talhoes/:
+    get:
+      operationId: v1_pivots_talhoes_list
+      description: Gestão de Talhões vinculados às Fazendas.
+      parameters:
+      - name: page
+        required: false
+        in: query
+        description: Um número de página dentro do conjunto de resultados paginado.
+        schema:
+          type: integer
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedTalhaoList'
+          description: ''
+    post:
+      operationId: v1_pivots_talhoes_create
+      description: Gestão de Talhões vinculados às Fazendas.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Talhao'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Talhao'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Talhao'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '201':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Talhao'
+          description: ''
+  /api/v1/pivots/talhoes/{id}/:
+    get:
+      operationId: v1_pivots_talhoes_retrieve
+      description: Gestão de Talhões vinculados às Fazendas.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Talhão.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Talhao'
+          description: ''
+    put:
+      operationId: v1_pivots_talhoes_update
+      description: Gestão de Talhões vinculados às Fazendas.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Talhão.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Talhao'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/Talhao'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/Talhao'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Talhao'
+          description: ''
+    patch:
+      operationId: v1_pivots_talhoes_partial_update
+      description: Gestão de Talhões vinculados às Fazendas.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Talhão.
+        required: true
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchedTalhao'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/PatchedTalhao'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/PatchedTalhao'
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Talhao'
+          description: ''
+    delete:
+      operationId: v1_pivots_talhoes_destroy
+      description: Gestão de Talhões vinculados às Fazendas.
+      parameters:
+      - in: path
+        name: id
+        schema:
+          type: string
+          format: uuid
+        description: Um string UUID que identifica este Talhão.
+        required: true
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      responses:
+        '204':
+          description: No response body
+  /api/v1/sync/pull/:
+    get:
+      operationId: v1_sync_pull_retrieve
+      description: Retorna o catálogo completo de dados vigentes para cache no SQLite
+        local do mobile.
+      tags:
+      - v1
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+                description: Unspecified response body
+          description: ''
+  /api/v1/sync/push/:
+    post:
+      operationId: v1_sync_push_create
+      description: Endpoint de sincronização em lote com proteção estrita de idempotência.
+      tags:
+      - v1
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SyncPushBatch'
+          application/x-www-form-urlencoded:
+            schema:
+              $ref: '#/components/schemas/SyncPushBatch'
+          multipart/form-data:
+            schema:
+              $ref: '#/components/schemas/SyncPushBatch'
+        required: true
+      security:
+      - tokenAuth: []
+      - cookieAuth: []
+      - {}
+      responses:
+        '200':
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: {}
+                description: Unspecified response body
+          description: ''
+components:
+  schemas:
+    ActionEnum:
+      enum:
+      - CREATE
+      - UPDATE
+      - ACKNOWLEDGE
+      type: string
+      description: |-
+        * `CREATE` - CREATE
+        * `UPDATE` - UPDATE
+        * `ACKNOWLEDGE` - ACKNOWLEDGE
+    Alerta:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        pivo:
+          type: string
+          format: uuid
+        pivo_codigo:
+          type: string
+          description: 'Identificador único na fazenda, ex: PIV-01'
+          readOnly: true
+        tipo:
+          type: string
+          maxLength: 60
+        severidade:
+          $ref: '#/components/schemas/SeveridadeEnum'
+        severidade_display:
+          type: string
+          readOnly: true
+        titulo:
+          type: string
+          maxLength: 150
+        mensagem:
+          type: string
+        gerado_em:
+          type: string
+          format: date-time
+          readOnly: true
+        reconhecido_em:
+          type: string
+          format: date-time
+          nullable: true
+        reconhecido_por:
+          type: integer
+          nullable: true
+        resolvido_em:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+      - gerado_em
+      - id
+      - mensagem
+      - pivo
+      - pivo_codigo
+      - severidade_display
+      - titulo
+    AuditLog:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        tabela:
+          type: string
+          maxLength: 100
+        entidade_id:
+          type: string
+          maxLength: 64
+        acao:
+          type: string
+          maxLength: 20
+        detalhes: {}
+        usuario:
+          type: integer
+          nullable: true
+        usuario_nome:
+          type: string
+          readOnly: true
+        ip_address:
+          type: string
+          nullable: true
+        criado_em:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - acao
+      - criado_em
+      - entidade_id
+      - id
+      - tabela
+      - usuario_nome
+    Cultura:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        nome:
+          type: string
+          maxLength: 100
+        variedade:
+          type: string
+          maxLength: 100
+        dias_ciclo_estimado:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        coeficiente_kc_padrao:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,2}(?:\.\d{0,2})?$
+        criado_em:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - criado_em
+      - id
+      - nome
+    EntityEnum:
+      enum:
+      - pivo
+      - registro_irrigacao
+      - alerta
+      type: string
+      description: |-
+        * `pivo` - pivo
+        * `registro_irrigacao` - registro_irrigacao
+        * `alerta` - alerta
+    Fazenda:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        nome:
+          type: string
+          maxLength: 150
+        codigo:
+          type: string
+          maxLength: 50
+        municipio:
+          type: string
+          maxLength: 100
+        uf:
+          type: string
+          maxLength: 2
+        latitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        longitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        area_total_ha:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        pivos_count:
+          type: integer
+          readOnly: true
+        criado_em:
+          type: string
+          format: date-time
+          readOnly: true
+        atualizado_em:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - atualizado_em
+      - codigo
+      - criado_em
+      - id
+      - municipio
+      - nome
+      - pivos_count
+      - uf
+    JanelaOportunidade:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        pivo:
+          type: string
+          format: uuid
+        pivo_codigo:
+          type: string
+          description: 'Identificador único na fazenda, ex: PIV-01'
+          readOnly: true
+        inicio_previsto:
+          type: string
+          format: date-time
+        fim_previsto:
+          type: string
+          format: date-time
+        motivo:
+          type: string
+          maxLength: 150
+        tarifa_vigente:
+          type: string
+          maxLength: 50
+        economia_estimada_reais:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+        recomendacao:
+          type: string
+        aproveitada:
+          type: boolean
+      required:
+      - fim_previsto
+      - id
+      - inicio_previsto
+      - pivo
+      - pivo_codigo
+    LoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+          writeOnly: true
+      required:
+      - password
+      - username
+    OrigemEnum:
+      enum:
+      - WEB
+      - MOBILE_OFFLINE
+      - TELEMETRIA
+      type: string
+      description: |-
+        * `WEB` - Aplicação Web
+        * `MOBILE_OFFLINE` - Aplicativo Mobile (Offline Sync)
+        * `TELEMETRIA` - Telemetria Automática
+    PaginatedAlertaList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Alerta'
+    PaginatedAuditLogList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLog'
+    PaginatedCulturaList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cultura'
+    PaginatedFazendaList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Fazenda'
+    PaginatedJanelaOportunidadeList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/JanelaOportunidade'
+    PaginatedPivoList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Pivo'
+    PaginatedPlanoOperacionalList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/PlanoOperacional'
+    PaginatedRegistroIrrigacaoList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/RegistroIrrigacao'
+    PaginatedSafraList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Safra'
+    PaginatedTalhaoList:
+      type: object
+      required:
+      - count
+      - results
+      properties:
+        count:
+          type: integer
+          example: 123
+        next:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=4
+        previous:
+          type: string
+          nullable: true
+          format: uri
+          example: http://api.example.org/accounts/?page=2
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/Talhao'
+    PatchedAlerta:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        pivo:
+          type: string
+          format: uuid
+        pivo_codigo:
+          type: string
+          description: 'Identificador único na fazenda, ex: PIV-01'
+          readOnly: true
+        tipo:
+          type: string
+          maxLength: 60
+        severidade:
+          $ref: '#/components/schemas/SeveridadeEnum'
+        severidade_display:
+          type: string
+          readOnly: true
+        titulo:
+          type: string
+          maxLength: 150
+        mensagem:
+          type: string
+        gerado_em:
+          type: string
+          format: date-time
+          readOnly: true
+        reconhecido_em:
+          type: string
+          format: date-time
+          nullable: true
+        reconhecido_por:
+          type: integer
+          nullable: true
+        resolvido_em:
+          type: string
+          format: date-time
+          nullable: true
+    PatchedCultura:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        nome:
+          type: string
+          maxLength: 100
+        variedade:
+          type: string
+          maxLength: 100
+        dias_ciclo_estimado:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        coeficiente_kc_padrao:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,2}(?:\.\d{0,2})?$
+        criado_em:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedFazenda:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        nome:
+          type: string
+          maxLength: 150
+        codigo:
+          type: string
+          maxLength: 50
+        municipio:
+          type: string
+          maxLength: 100
+        uf:
+          type: string
+          maxLength: 2
+        latitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        longitude:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+          nullable: true
+        area_total_ha:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+        pivos_count:
+          type: integer
+          readOnly: true
+        criado_em:
+          type: string
+          format: date-time
+          readOnly: true
+        atualizado_em:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedJanelaOportunidade:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        pivo:
+          type: string
+          format: uuid
+        pivo_codigo:
+          type: string
+          description: 'Identificador único na fazenda, ex: PIV-01'
+          readOnly: true
+        inicio_previsto:
+          type: string
+          format: date-time
+        fim_previsto:
+          type: string
+          format: date-time
+        motivo:
+          type: string
+          maxLength: 150
+        tarifa_vigente:
+          type: string
+          maxLength: 50
+        economia_estimada_reais:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+        recomendacao:
+          type: string
+        aproveitada:
+          type: boolean
+    PatchedPivo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        fazenda:
+          type: string
+          format: uuid
+        fazenda_nome:
+          type: string
+          readOnly: true
+        codigo:
+          type: string
+          description: 'Identificador único na fazenda, ex: PIV-01'
+          maxLength: 50
+        nome:
+          type: string
+          description: 'Nome descritivo, ex: Pivô Sede Norte'
+          maxLength: 100
+        fabricante:
+          type: string
+          maxLength: 80
+        modelo:
+          type: string
+          maxLength: 80
+        latitude_centro:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+        longitude_centro:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+        raio_metros:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          description: Comprimento total da estrutura em metros
+        area_irrigada_ha:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          description: Área irrigada total em hectares
+        vazao_nominal_m3h:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          description: Vazão de projeto em m³/h
+        pressao_nominal_bar:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          description: Pressão recomendada na base em bar
+        velocidade_100_percent_mh:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          description: Velocidade da última torre a 100% (m/h)
+        angulo_inicial_graus:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        angulo_final_graus:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        status_operacional:
+          $ref: '#/components/schemas/StatusOperacionalEnum'
+        status_display:
+          type: string
+          readOnly: true
+        angulo_atual_graus:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        sentido_rotacao:
+          $ref: '#/components/schemas/SentidoRotacaoEnum'
+        sentido_display:
+          type: string
+          readOnly: true
+        percentimetro_atual:
+          type: integer
+          maximum: 100
+          minimum: 1
+        lamina_atual_mm:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          description: Lâmina de água em mm aplicada no percentímetro atual
+        pressao_atual_bar:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        tensao_eletrica_v:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        ultima_comunicacao:
+          type: string
+          format: date-time
+          readOnly: true
+        ativo:
+          type: boolean
+        criado_em:
+          type: string
+          format: date-time
+          readOnly: true
+        atualizado_em:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedPlanoOperacional:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        safra:
+          type: string
+          format: uuid
+        safra_nome:
+          type: string
+          readOnly: true
+        pivo:
+          type: string
+          format: uuid
+        pivo_codigo:
+          type: string
+          description: 'Identificador único na fazenda, ex: PIV-01'
+          readOnly: true
+        cultura:
+          type: string
+          format: uuid
+        cultura_nome:
+          type: string
+          readOnly: true
+        data_plantio:
+          type: string
+          format: date
+        data_colheita_prevista:
+          type: string
+          format: date
+        lamina_total_planejada_mm:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        lamina_acumulada_realizada_mm:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        criado_em:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedRegistroIrrigacao:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        client_op_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Chave de idempotência enviada pelo mobile
+        pivo:
+          type: string
+          format: uuid
+        pivo_codigo:
+          type: string
+          description: 'Identificador único na fazenda, ex: PIV-01'
+          readOnly: true
+        plano_operacional:
+          type: string
+          format: uuid
+          nullable: true
+        operador:
+          type: integer
+          nullable: true
+        operador_nome:
+          type: string
+          readOnly: true
+        inicio_em:
+          type: string
+          format: date-time
+        fim_em:
+          type: string
+          format: date-time
+          nullable: true
+        percentimetro:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        lamina_aplicada_mm:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        angulo_inicial_graus:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        angulo_final_graus:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        sentido:
+          type: string
+          maxLength: 20
+        hidrometro_inicial_m3:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        hidrometro_final_m3:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        consumo_kwh:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+        tarifa_aplicada:
+          type: string
+          maxLength: 50
+        origem:
+          $ref: '#/components/schemas/OrigemEnum'
+        observacoes:
+          type: string
+        criado_em:
+          type: string
+          format: date-time
+          readOnly: true
+        atualizado_em:
+          type: string
+          format: date-time
+          readOnly: true
+    PatchedSafra:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        nome:
+          type: string
+          maxLength: 100
+        data_inicio:
+          type: string
+          format: date
+        data_fim:
+          type: string
+          format: date
+        ativa:
+          type: boolean
+    PatchedTalhao:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        fazenda:
+          type: string
+          format: uuid
+        fazenda_nome:
+          type: string
+          readOnly: true
+        codigo:
+          type: string
+          maxLength: 50
+        nome:
+          type: string
+          maxLength: 100
+        area_ha:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+        criado_em:
+          type: string
+          format: date-time
+          readOnly: true
+    Pivo:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        fazenda:
+          type: string
+          format: uuid
+        fazenda_nome:
+          type: string
+          readOnly: true
+        codigo:
+          type: string
+          description: 'Identificador único na fazenda, ex: PIV-01'
+          maxLength: 50
+        nome:
+          type: string
+          description: 'Nome descritivo, ex: Pivô Sede Norte'
+          maxLength: 100
+        fabricante:
+          type: string
+          maxLength: 80
+        modelo:
+          type: string
+          maxLength: 80
+        latitude_centro:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+        longitude_centro:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,6})?$
+        raio_metros:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+          description: Comprimento total da estrutura em metros
+        area_irrigada_ha:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          description: Área irrigada total em hectares
+        vazao_nominal_m3h:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+          description: Vazão de projeto em m³/h
+        pressao_nominal_bar:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          description: Pressão recomendada na base em bar
+        velocidade_100_percent_mh:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          description: Velocidade da última torre a 100% (m/h)
+        angulo_inicial_graus:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        angulo_final_graus:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        status_operacional:
+          $ref: '#/components/schemas/StatusOperacionalEnum'
+        status_display:
+          type: string
+          readOnly: true
+        angulo_atual_graus:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        sentido_rotacao:
+          $ref: '#/components/schemas/SentidoRotacaoEnum'
+        sentido_display:
+          type: string
+          readOnly: true
+        percentimetro_atual:
+          type: integer
+          maximum: 100
+          minimum: 1
+        lamina_atual_mm:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+          description: Lâmina de água em mm aplicada no percentímetro atual
+        pressao_atual_bar:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        tensao_eletrica_v:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        ultima_comunicacao:
+          type: string
+          format: date-time
+          readOnly: true
+        ativo:
+          type: boolean
+        criado_em:
+          type: string
+          format: date-time
+          readOnly: true
+        atualizado_em:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - atualizado_em
+      - codigo
+      - criado_em
+      - fazenda
+      - fazenda_nome
+      - id
+      - nome
+      - sentido_display
+      - status_display
+      - ultima_comunicacao
+    PlanoOperacional:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        safra:
+          type: string
+          format: uuid
+        safra_nome:
+          type: string
+          readOnly: true
+        pivo:
+          type: string
+          format: uuid
+        pivo_codigo:
+          type: string
+          description: 'Identificador único na fazenda, ex: PIV-01'
+          readOnly: true
+        cultura:
+          type: string
+          format: uuid
+        cultura_nome:
+          type: string
+          readOnly: true
+        data_plantio:
+          type: string
+          format: date
+        data_colheita_prevista:
+          type: string
+          format: date
+        lamina_total_planejada_mm:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        lamina_acumulada_realizada_mm:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,5}(?:\.\d{0,2})?$
+        status:
+          $ref: '#/components/schemas/StatusEnum'
+        criado_em:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - criado_em
+      - cultura
+      - cultura_nome
+      - data_colheita_prevista
+      - data_plantio
+      - id
+      - pivo
+      - pivo_codigo
+      - safra
+      - safra_nome
+    RegistroIrrigacao:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        client_op_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Chave de idempotência enviada pelo mobile
+        pivo:
+          type: string
+          format: uuid
+        pivo_codigo:
+          type: string
+          description: 'Identificador único na fazenda, ex: PIV-01'
+          readOnly: true
+        plano_operacional:
+          type: string
+          format: uuid
+          nullable: true
+        operador:
+          type: integer
+          nullable: true
+        operador_nome:
+          type: string
+          readOnly: true
+        inicio_em:
+          type: string
+          format: date-time
+        fim_em:
+          type: string
+          format: date-time
+          nullable: true
+        percentimetro:
+          type: integer
+          maximum: 9223372036854775807
+          minimum: 0
+          format: int64
+        lamina_aplicada_mm:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,4}(?:\.\d{0,2})?$
+        angulo_inicial_graus:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        angulo_final_graus:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,3}(?:\.\d{0,2})?$
+        sentido:
+          type: string
+          maxLength: 20
+        hidrometro_inicial_m3:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        hidrometro_final_m3:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,10}(?:\.\d{0,2})?$
+          nullable: true
+        consumo_kwh:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,8}(?:\.\d{0,2})?$
+          nullable: true
+        tarifa_aplicada:
+          type: string
+          maxLength: 50
+        origem:
+          $ref: '#/components/schemas/OrigemEnum'
+        observacoes:
+          type: string
+        criado_em:
+          type: string
+          format: date-time
+          readOnly: true
+        atualizado_em:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - atualizado_em
+      - criado_em
+      - id
+      - inicio_em
+      - operador_nome
+      - pivo
+      - pivo_codigo
+    RoleEnum:
+      enum:
+      - ADMIN
+      - GESTOR
+      - OPERADOR
+      - CONSULTOR
+      type: string
+      description: |-
+        * `ADMIN` - Administrador do Sistema
+        * `GESTOR` - Gestor Agrícola
+        * `OPERADOR` - Operador de Campo
+        * `CONSULTOR` - Auditor / Consulta
+    Safra:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        nome:
+          type: string
+          maxLength: 100
+        data_inicio:
+          type: string
+          format: date
+        data_fim:
+          type: string
+          format: date
+        ativa:
+          type: boolean
+      required:
+      - data_fim
+      - data_inicio
+      - id
+      - nome
+    SentidoRotacaoEnum:
+      enum:
+      - HORARIO
+      - ANTI_HORARIO
+      - ESTACIONARIO
+      type: string
+      description: |-
+        * `HORARIO` - Horário (Sentido dos Ponteiros)
+        * `ANTI_HORARIO` - Anti-Horário
+        * `ESTACIONARIO` - Estacionário
+    SeveridadeEnum:
+      enum:
+      - INFO
+      - ATENCAO
+      - CRITICO
+      type: string
+      description: |-
+        * `INFO` - Informativo
+        * `ATENCAO` - Atenção Operacional
+        * `CRITICO` - Crítico / Parada de Emergência
+    SingleSyncOperation:
+      type: object
+      properties:
+        client_op_id:
+          type: string
+          format: uuid
+        entity:
+          $ref: '#/components/schemas/EntityEnum'
+        action:
+          $ref: '#/components/schemas/ActionEnum'
+        occurred_at:
+          type: string
+          format: date-time
+        payload:
+          type: object
+          additionalProperties: {}
+      required:
+      - action
+      - client_op_id
+      - entity
+      - occurred_at
+      - payload
+    StatusEnum:
+      enum:
+      - PLANEJADO
+      - EM_ANDAMENTO
+      - CONCLUIDO
+      - CANCELADO
+      type: string
+      description: |-
+        * `PLANEJADO` - Planejado
+        * `EM_ANDAMENTO` - Em Andamento
+        * `CONCLUIDO` - Concluído
+        * `CANCELADO` - Cancelado
+    StatusOperacionalEnum:
+      enum:
+      - PARADO
+      - IRRIGANDO
+      - FERTIRRIGANDO
+      - MANUTENCAO
+      - FALHA
+      type: string
+      description: |-
+        * `PARADO` - Parado / Desligado
+        * `IRRIGANDO` - Irrigando com Água
+        * `FERTIRRIGANDO` - Fertirrigação Ativa
+        * `MANUTENCAO` - Em Manutenção
+        * `FALHA` - Falha Operacional / Interrompido
+    SyncPushBatch:
+      type: object
+      properties:
+        client_device_id:
+          type: string
+          default: MOBILE_UNKNOWN
+          maxLength: 100
+        batch_timestamp:
+          type: string
+          format: date-time
+        operations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SingleSyncOperation'
+      required:
+      - operations
+    Talhao:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        fazenda:
+          type: string
+          format: uuid
+        fazenda_nome:
+          type: string
+          readOnly: true
+        codigo:
+          type: string
+          maxLength: 50
+        nome:
+          type: string
+          maxLength: 100
+        area_ha:
+          type: string
+          format: decimal
+          pattern: ^-?\d{0,6}(?:\.\d{0,2})?$
+        criado_em:
+          type: string
+          format: date-time
+          readOnly: true
+      required:
+      - area_ha
+      - codigo
+      - criado_em
+      - fazenda
+      - fazenda_nome
+      - id
+      - nome
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          readOnly: true
+        username:
+          type: string
+          title: Usuário
+          description: Obrigatório. 150 caracteres ou menos. Letras, números e @/./+/-/_
+            apenas.
+          pattern: ^[\w.@+-]+$
+          maxLength: 150
+        email:
+          title: Endereço de email
+          oneOf:
+          - type: string
+            format: email
+            maxLength: 254
+          - type: string
+            maxLength: 0
+        first_name:
+          type: string
+          title: Primeiro nome
+          maxLength: 150
+        last_name:
+          type: string
+          title: Último nome
+          maxLength: 150
+        is_staff:
+          type: boolean
+          title: Membro da equipe
+          description: Indica que usuário consegue acessar este site de administração.
+        profile:
+          allOf:
+          - $ref: '#/components/schemas/UserProfile'
+          readOnly: true
+      required:
+      - id
+      - profile
+      - username
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          readOnly: true
+        role:
+          $ref: '#/components/schemas/RoleEnum'
+        telefone:
+          type: string
+          maxLength: 30
+        departamento:
+          type: string
+          maxLength: 100
+        ativo:
+          type: boolean
+      required:
+      - id
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: sessionid
+    tokenAuth:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Token-based authentication with required prefix "Token"
