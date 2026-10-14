@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,10 @@ import {
   TextInput,
   Modal,
   Alert,
+  RefreshControl,
+  useWindowDimensions,
 } from "react-native";
+import { Search, X, CalendarDays, Sprout } from "lucide-react-native";
 import { MobileCropPlan, CropPlanStatus, PendingSyncItem, MobileFarm, MobileSeason } from "../types";
 import { localDb } from "../database/sqlite";
 import { syncManager } from "../services/syncManager";
@@ -18,10 +21,10 @@ import { syncManager } from "../services/syncManager";
 interface PlanningScreenProps {
   onOpenSync: () => void;
   userRole?: string;
+  initialViewMode?: "GANTT" | "LISTA";
 }
 
-type ViewMode = "GANTT" | "LISTA";
-type GanttSubMode = "TIMELINE" | "SEQUENCE";
+type TimelineScale = "SEMANA" | "MES";
 
 interface FreeInterval {
   id: string;
@@ -45,16 +48,16 @@ interface ConflictInterval {
   cultura2: string;
 }
 
-// Cores temáticas para culturas agrícolas no celular
+// Cores temáticas para culturas agrícolas idênticas ao navegador e ao padrão corporativo
 const CROP_MOBILE_COLORS: Record<string, { bg: string; border: string; text: string; badge: string }> = {
-  SOJA: { bg: "#ecfdf5", border: "#10b981", text: "#065f46", badge: "#059669" },
-  MILHO: { bg: "#fffbeb", border: "#f59e0b", text: "#92400e", badge: "#d97706" },
-  FEIJÃO: { bg: "#ecfeff", border: "#06b6d4", text: "#155e75", badge: "#0891b2" },
-  FEIJAO: { bg: "#ecfeff", border: "#06b6d4", text: "#155e75", badge: "#0891b2" },
-  ALGODÃO: { bg: "#faf5ff", border: "#a855f7", text: "#6b21a8", badge: "#9333ea" },
-  ALGODAO: { bg: "#faf5ff", border: "#a855f7", text: "#6b21a8", badge: "#9333ea" },
-  SORGO: { bg: "#fff7ed", border: "#f97316", text: "#9a3412", badge: "#ea580c" },
-  TRIGO: { bg: "#fefce8", border: "#eab308", text: "#854d0e", badge: "#ca8a04" },
+  SOJA: { bg: "#ecfdf5", border: "#10b981", text: "#047857", badge: "#059669" },
+  MILHO: { bg: "#fffbeb", border: "#f59e0b", text: "#b45309", badge: "#d97706" },
+  FEIJÃO: { bg: "#ecfeff", border: "#06b6d4", text: "#0e7490", badge: "#0891b2" },
+  FEIJAO: { bg: "#ecfeff", border: "#06b6d4", text: "#0e7490", badge: "#0891b2" },
+  ALGODÃO: { bg: "#faf5ff", border: "#a855f7", text: "#7e22ce", badge: "#9333ea" },
+  ALGODAO: { bg: "#faf5ff", border: "#a855f7", text: "#7e22ce", badge: "#9333ea" },
+  SORGO: { bg: "#fff7ed", border: "#f97316", text: "#c2410c", badge: "#ea580c" },
+  TRIGO: { bg: "#fefce8", border: "#eab308", text: "#a16207", badge: "#ca8a04" },
   DEFAULT: { bg: "#eff6ff", border: "#3b82f6", text: "#1e40af", badge: "#2563eb" },
 };
 
@@ -66,16 +69,31 @@ function getCropColors(name: string) {
   return CROP_MOBILE_COLORS.DEFAULT;
 }
 
-export function PlanningScreen({ onOpenSync, userRole = "OPERADOR" }: PlanningScreenProps) {
+export function PlanningScreen({ onOpenSync, userRole = "OPERADOR", initialViewMode = "GANTT" }: PlanningScreenProps) {
+  const viewMode = initialViewMode;
+  const { width: screenWidth } = useWindowDimensions();
+  const isDesktop = screenWidth >= 768;
+  const leftColWidth = isDesktop ? 210 : screenWidth < 360 ? 94 : 108;
+  const HEADER_HEIGHT = 46;
+
   const [plans, setPlans] = useState<MobileCropPlan[]>([]);
   const [farms, setFarms] = useState<MobileFarm[]>([]);
   const [seasons, setSeasons] = useState<MobileSeason[]>([]);
   const [loading, setLoading] = useState(true);
-  const [syncing, setSyncing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Modos de visualização
-  const [viewMode, setViewMode] = useState<ViewMode>("GANTT");
-  const [ganttSubMode, setGanttSubMode] = useState<GanttSubMode>("TIMELINE");
+  // Escala Temporal do Gantt
+  const [timelineScale, setTimelineScale] = useState<TimelineScale>("MES");
+  const [baseDate, setBaseDate] = useState<Date>(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d;
+  });
+
+  // Refs de rolagem para sincronização horizontal precisa
+  const headerScrollRef = useRef<ScrollView>(null);
+  const bodyScrollRef = useRef<ScrollView>(null);
+  const isHeaderScrolling = useRef(false);
 
   // Filtros
   const [search, setSearch] = useState("");
@@ -92,15 +110,29 @@ export function PlanningScreen({ onOpenSync, userRole = "OPERADOR" }: PlanningSc
 
   const isConsultor = userRole === "CONSULTOR";
 
-  const loadData = async () => {
+  const loadData = async (shouldSync = false) => {
     setLoading(true);
-    const [pData, fData, sData, count, conflicts] = await Promise.all([
-      localDb.getPlans(),
-      localDb.getFarms(),
-      localDb.getSeasons(),
+    if (shouldSync) {
+      await syncManager.syncAll().catch(() => {});
+    }
+
+    let pData = await localDb.getPlans();
+    let fData = await localDb.getFarms();
+    let sData = await localDb.getSeasons();
+
+    // Auto-sync se os planos locais estiverem vazios
+    if (pData.length === 0 && !shouldSync) {
+      await syncManager.syncAll().catch(() => {});
+      pData = await localDb.getPlans();
+      fData = await localDb.getFarms();
+      sData = await localDb.getSeasons();
+    }
+
+    const [count, conflicts] = await Promise.all([
       localDb.getQueueCount(),
       localDb.getConflictQueue(),
     ]);
+
     setPlans(pData);
     setFarms(fData);
     setSeasons(sData);
@@ -108,18 +140,16 @@ export function PlanningScreen({ onOpenSync, userRole = "OPERADOR" }: PlanningSc
     setConflictQueue(conflicts);
     setConflictCount(conflicts.length);
     setLoading(false);
+    setRefreshing(false);
   };
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const handleSyncNow = async () => {
-    setSyncing(true);
-    const result = await syncManager.syncAll();
-    await loadData();
-    setSyncing(false);
-    Alert.alert("Sincronização", result.message);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadData(true);
   };
 
   const handleStatusTransition = async (plan: MobileCropPlan, nextStatus: CropPlanStatus) => {
@@ -250,6 +280,7 @@ export function PlanningScreen({ onOpenSync, userRole = "OPERADOR" }: PlanningSc
       codigo: string;
       alvoNome: string;
       fazendaNome: string;
+      areaHa: number;
       plans: MobileCropPlan[];
       freeIntervals: FreeInterval[];
       conflicts: ConflictInterval[];
@@ -272,6 +303,7 @@ export function PlanningScreen({ onOpenSync, userRole = "OPERADOR" }: PlanningSc
           codigo: p.pivo_codigo || p.alvo_nome,
           alvoNome: p.alvo_nome,
           fazendaNome: p.fazenda_nome,
+          areaHa: Number(p.area_planejada_ha || 0),
           plans: [],
           freeIntervals: [],
           conflicts: [],
@@ -334,105 +366,283 @@ export function PlanningScreen({ onOpenSync, userRole = "OPERADOR" }: PlanningSc
     return Array.from(map.values());
   }, [plans, farmFilter, seasonFilter]);
 
-  // Colunas mensais para a régua horizontal do Gantt mobile
-  const timelineMonths = useMemo(() => {
-    const list: Array<{ label: string; yearMonth: string; start: Date; end: Date }> = [];
-    const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-    
-    // Inicia 3 meses atrás e projeta 12 meses para frente para cobrir o ciclo agrícola atual
-    const baseDate = new Date();
-    baseDate.setDate(1);
-    baseDate.setMonth(baseDate.getMonth() - 2);
+  // Altura dinâmica de linha para preencher o espaço vertical quando houver poucos pivôs
+  const ROW_HEIGHT = useMemo(() => {
+    const count = pivotGroups.length;
+    if (count <= 2) return isDesktop ? 104 : 88;
+    if (count <= 4) return isDesktop ? 94 : 80;
+    if (count <= 6) return isDesktop ? 82 : 72;
+    return 62;
+  }, [pivotGroups.length, isDesktop]);
 
-    for (let i = 0; i < 14; i++) {
-      const cur = new Date(baseDate.getFullYear(), baseDate.getMonth() + i, 1);
-      const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
-      list.push({
-        label: `${monthNames[cur.getMonth()]}/${String(cur.getFullYear()).slice(-2)}`,
-        yearMonth: `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}`,
-        start: cur,
-        end: next,
-      });
+  const BAR_HEIGHT = useMemo(() => {
+    if (ROW_HEIGHT >= 80) return 46;
+    if (ROW_HEIGHT >= 72) return 42;
+    return 38;
+  }, [ROW_HEIGHT]);
+
+  // Métricas operacionais para preenchimento de tela no Cockpit
+  const totalPlannedArea = useMemo(() => {
+    return plans.reduce((acc, p) => acc + Number(p.area_planejada_ha || 0), 0);
+  }, [plans]);
+
+  const activePlansCount = useMemo(() => {
+    return plans.filter((p) => p.status !== "CANCELADO").length;
+  }, [plans]);
+
+  const totalFreeIntervalsCount = useMemo(() => {
+    return pivotGroups.reduce((acc, g) => acc + g.freeIntervals.length, 0);
+  }, [pivotGroups]);
+
+  // Colunas da Régua Temporal Compartilhada (Semana ou Mês)
+  const timelineCols = useMemo(() => {
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+
+    if (timelineScale === "MES") {
+      const cols = [];
+      const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+      const colWidth = isDesktop ? 120 : 88;
+      const startYear = baseDate.getFullYear();
+      const startMonth = baseDate.getMonth() - 1;
+
+      for (let i = 0; i < 10; i++) {
+        const cur = new Date(startYear, startMonth + i, 1);
+        const next = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+        const isCurMonth = cur.getMonth() === now.getMonth() && cur.getFullYear() === now.getFullYear();
+
+        cols.push({
+          key: `m-${cur.getFullYear()}-${cur.getMonth()}`,
+          title: `${monthNames[cur.getMonth()]}/${String(cur.getFullYear()).slice(-2)}`,
+          sub: `${cur.getFullYear()}`,
+          start: cur,
+          end: next,
+          width: colWidth,
+          left: i * colWidth,
+          isToday: isCurMonth,
+          isWeekend: false,
+        });
+      }
+      return cols;
+    } else {
+      // Escala SEMANA: 21 dias (3 semanas: 1 anterior, atual e 1 posterior)
+      const cols = [];
+      const dayWidth = isDesktop ? 68 : 50;
+      const weekDays = ["Seg", "Ter", "Qua", "Qui", "Sex", "Sáb", "Dom"];
+      const dayOfWeek = (baseDate.getDay() + 6) % 7; // Segunda = 0
+      const startMonday = new Date(baseDate.getFullYear(), baseDate.getMonth(), baseDate.getDate() - dayOfWeek - 7);
+
+      for (let i = 0; i < 21; i++) {
+        const cur = new Date(startMonday.getFullYear(), startMonday.getMonth(), startMonday.getDate() + i, 0, 0, 0);
+        const next = new Date(cur.getFullYear(), cur.getMonth(), cur.getDate() + 1, 0, 0, 0);
+        const curStr = `${cur.getFullYear()}-${String(cur.getMonth() + 1).padStart(2, "0")}-${String(cur.getDate()).padStart(2, "0")}`;
+        const dow = (cur.getDay() + 6) % 7;
+
+        cols.push({
+          key: `d-${curStr}`,
+          title: `${weekDays[dow]} ${cur.getDate()}`,
+          sub: `${String(cur.getMonth() + 1).padStart(2, "0")}/${String(cur.getFullYear()).slice(-2)}`,
+          start: cur,
+          end: next,
+          width: dayWidth,
+          left: i * dayWidth,
+          isToday: curStr === todayStr,
+          isWeekend: dow >= 5,
+        });
+      }
+      return cols;
     }
-    return list;
-  }, []);
+  }, [timelineScale, baseDate, isDesktop]);
 
-  const timelineStart = timelineMonths[0]?.start || new Date();
-  const timelineEnd = timelineMonths[timelineMonths.length - 1]?.end || new Date();
-  const totalTimelineDays = Math.max(1, Math.round((timelineEnd.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24)));
-  const COLUMN_WIDTH = 95; // Largura amigável para toque e leitura no celular
-  const TOTAL_TIMELINE_WIDTH = timelineMonths.length * COLUMN_WIDTH;
+  const timelineStart = timelineCols[0]?.start || new Date();
+  const timelineEnd = timelineCols[timelineCols.length - 1]?.end || new Date();
+  const totalTimelineDays = Math.max(1, (timelineEnd.getTime() - timelineStart.getTime()) / (1000 * 60 * 60 * 24));
+  const totalTimelineWidth = timelineCols.reduce((acc, col) => acc + col.width, 0);
 
-  // Função para converter datas em posição X e largura no gráfico móvel
-  const getPositionX = (startDateStr: string, endDateStr: string) => {
-    const s = new Date(startDateStr + "T00:00:00").getTime();
-    const e = new Date(endDateStr + "T00:00:00").getTime();
+  // Marcador de Hoje (Linha Vermelha Vertical)
+  const todayOffset = useMemo(() => {
+    const nowT = new Date().getTime();
     const startT = timelineStart.getTime();
+    const endT = timelineEnd.getTime();
+    if (nowT < startT || nowT > endT) return null;
+    const diffDays = (nowT - startT) / (1000 * 60 * 60 * 24);
+    return (diffDays / totalTimelineDays) * totalTimelineWidth;
+  }, [timelineStart, timelineEnd, totalTimelineDays, totalTimelineWidth]);
 
-    const diffStartDays = (s - startT) / (1000 * 60 * 60 * 24);
-    const durationDays = Math.max(2, (e - s) / (1000 * 60 * 60 * 24));
+  // Conversão de datas para posições absolutas na escala compartilhada
+  const getPosition = (startDateStr?: string | null, endDateStr?: string | null) => {
+    if (!startDateStr || !endDateStr) return null;
+    const s = new Date(startDateStr + "T00:00:00").getTime();
+    const e = new Date(endDateStr + "T23:59:59").getTime();
+    const startT = timelineStart.getTime();
+    const endT = timelineEnd.getTime();
 
-    const left = (diffStartDays / totalTimelineDays) * TOTAL_TIMELINE_WIDTH;
-    const width = Math.max(28, (durationDays / totalTimelineDays) * TOTAL_TIMELINE_WIDTH);
+    if (e < startT || s > endT) return null;
 
-    return { left, width, days: Math.round(durationDays) };
+    const clampedS = Math.max(s, startT);
+    const clampedE = Math.min(e, endT);
+
+    const diffDays = (clampedS - startT) / (1000 * 60 * 60 * 24);
+    const durationClamped = Math.max(0.5, (clampedE - clampedS) / (1000 * 60 * 60 * 24));
+    const fullDays = Math.max(1, Math.round((e - s) / (1000 * 60 * 60 * 24)));
+
+    const left = (diffDays / totalTimelineDays) * totalTimelineWidth;
+    const minBarWidth = timelineScale === "MES" ? 28 : 34;
+    const width = Math.max(minBarWidth, (durationClamped / totalTimelineDays) * totalTimelineWidth);
+
+    return { left, width, days: fullDays };
   };
+
+  // Controles de Navegação Temporal
+  const handleToday = () => {
+    const d = new Date();
+    if (timelineScale === "MES") {
+      d.setDate(1);
+    }
+    setBaseDate(d);
+    setTimeout(() => {
+      if (todayOffset != null) {
+        const scrollTarget = Math.max(0, todayOffset - (screenWidth - leftColWidth) / 2);
+        headerScrollRef.current?.scrollTo({ x: scrollTarget, animated: true });
+        bodyScrollRef.current?.scrollTo({ x: scrollTarget, animated: true });
+      }
+    }, 120);
+  };
+
+  const handlePrevPeriod = () => {
+    setBaseDate((prev) => {
+      const next = new Date(prev);
+      if (timelineScale === "MES") {
+        next.setMonth(next.getMonth() - 2);
+      } else {
+        next.setDate(next.getDate() - 7);
+      }
+      return next;
+    });
+  };
+
+  const handleNextPeriod = () => {
+    setBaseDate((prev) => {
+      const next = new Date(prev);
+      if (timelineScale === "MES") {
+        next.setMonth(next.getMonth() + 2);
+      } else {
+        next.setDate(next.getDate() + 7);
+      }
+      return next;
+    });
+  };
+
+  const periodLabelText = useMemo(() => {
+    if (timelineCols.length === 0) return "";
+    const first = timelineCols[0];
+    const last = timelineCols[timelineCols.length - 1];
+    const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+    if (timelineScale === "MES") {
+      return `${monthNames[first.start.getMonth()]}/${String(first.start.getFullYear()).slice(-2)} – ${monthNames[last.start.getMonth()]}/${String(last.start.getFullYear()).slice(-2)}`;
+    } else {
+      return `${first.start.getDate()} ${monthNames[first.start.getMonth()]} – ${last.start.getDate()} ${monthNames[last.start.getMonth()]}, ${last.start.getFullYear()}`;
+    }
+  }, [timelineCols, timelineScale]);
 
   const activeConflictForModal = selectedPlan ? getConflictForPlan(selectedPlan.id) : undefined;
 
   return (
     <View style={styles.container}>
-      {/* 1. Barra de Sincronização e Status */}
-      <View style={styles.syncBar}>
-        <TouchableOpacity style={styles.syncInfo} onPress={onOpenSync} activeOpacity={0.7}>
-          <Text style={styles.syncTitle}>Planejamento de Plantio</Text>
-          <View style={styles.syncSubRow}>
-            <Text style={styles.syncSubtitle}>
-              {pendingCount > 0 ? `${pendingCount} alteração(ões) pendente(s)` : "Base de dados offline"}
-            </Text>
-            {conflictCount > 0 && (
-              <View style={styles.syncConflictBadge}>
-                <Text style={styles.syncConflictBadgeText}>⚠️ {conflictCount} conflito(s)</Text>
-              </View>
-            )}
+      {/* 1. Cabeçalho Padronizado */}
+      <View style={styles.topHeader}>
+        <View style={styles.titleRow}>
+          <View style={styles.screenTitleGroup}>
+            <View style={styles.screenIconBox}>
+              <CalendarDays size={20} color="#10b981" />
+            </View>
+            <View>
+              <Text style={styles.screenTitle}>
+                {viewMode === "GANTT" ? "Cockpit de Pivôs" : "Planejamento de Cultivo"}
+              </Text>
+              <Text style={styles.screenSubtitle}>
+                {viewMode === "GANTT"
+                  ? `${pivotGroups.length} unidade(s) monitorada(s)`
+                  : `${filteredPlans.length} plano(s) cadastrado(s)`}
+              </Text>
+            </View>
           </View>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.syncButton} onPress={handleSyncNow} disabled={syncing}>
-          {syncing ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <Text style={styles.syncButtonText}>Sincronizar</Text>
-          )}
-        </TouchableOpacity>
+        </View>
+
+        {/* Barra de Controles do Cronograma (Apenas na tela do Cockpit) */}
+        {viewMode === "GANTT" && (
+          <View style={styles.timelineControlBar}>
+            {/* Navegação e Período */}
+            <View style={styles.navControls}>
+              <TouchableOpacity style={styles.navArrowBtn} onPress={handlePrevPeriod} activeOpacity={0.7}>
+                <Text style={styles.navArrowText}>◀</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.todayBtn} onPress={handleToday} activeOpacity={0.7}>
+                <Text style={styles.todayBtnText}>Hoje</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.navArrowBtn} onPress={handleNextPeriod} activeOpacity={0.7}>
+                <Text style={styles.navArrowText}>▶</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.periodLabel} numberOfLines={1}>
+                {periodLabelText}
+              </Text>
+            </View>
+
+            {/* Seletor de Escala: Semana vs Mês */}
+            <View style={styles.scaleSelector}>
+              <TouchableOpacity
+                style={[styles.scaleBtn, timelineScale === "SEMANA" && styles.scaleBtnActive]}
+                onPress={() => setTimelineScale("SEMANA")}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.scaleBtnText, timelineScale === "SEMANA" && styles.scaleBtnTextActive]}>
+                  Semana
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.scaleBtn, timelineScale === "MES" && styles.scaleBtnActive]}
+                onPress={() => setTimelineScale("MES")}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.scaleBtnText, timelineScale === "MES" && styles.scaleBtnTextActive]}>
+                  Mês
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
+
+        {/* Alerta de conflito / sobreposição se houver */}
+        {conflictCount > 0 && (
+          <TouchableOpacity
+            style={styles.conflictAlertBanner}
+            onPress={onOpenSync}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.conflictAlertText}>
+              ⚠️ {conflictCount} sobreposição(ões) de período detectada(s)
+            </Text>
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* 2. Seletor de Modo Principal: Gráfico Gantt vs Lista Detalhada */}
-      <View style={styles.viewModeBar}>
-        <TouchableOpacity
-          style={[styles.viewModeTab, viewMode === "GANTT" && styles.viewModeTabActive]}
-          onPress={() => setViewMode("GANTT")}
-        >
-          <Text style={[styles.viewModeTabText, viewMode === "GANTT" && styles.viewModeTabTextActive]}>
-            📊 Gráfico Gantt dos Pivôs
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={[styles.viewModeTab, viewMode === "LISTA" && styles.viewModeTabActive]}
-          onPress={() => setViewMode("LISTA")}
-        >
-          <Text style={[styles.viewModeTabText, viewMode === "LISTA" && styles.viewModeTabTextActive]}>
-            📋 Lista ({filteredPlans.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* 3. Filtros Rápidos de Fazenda */}
+      {/* 2. Filtros Compactos de Fazenda */}
       {farms.length > 0 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.filterChipScroll} contentContainerStyle={styles.filterChipContent}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.filterChipScroll}
+          contentContainerStyle={styles.filterChipContent}
+        >
           <TouchableOpacity
             style={[styles.chipPill, farmFilter === "TODAS" && styles.chipPillActive]}
             onPress={() => setFarmFilter("TODAS")}
+            activeOpacity={0.7}
           >
             <Text style={[styles.chipPillText, farmFilter === "TODAS" && styles.chipPillTextActive]}>
               Todas as Fazendas
@@ -443,6 +653,7 @@ export function PlanningScreen({ onOpenSync, userRole = "OPERADOR" }: PlanningSc
               key={f.id}
               style={[styles.chipPill, (farmFilter === f.id || farmFilter === f.nome) && styles.chipPillActive]}
               onPress={() => setFarmFilter(f.id)}
+              activeOpacity={0.7}
             >
               <Text style={[styles.chipPillText, (farmFilter === f.id || farmFilter === f.nome) && styles.chipPillTextActive]}>
                 {f.nome}
@@ -453,36 +664,10 @@ export function PlanningScreen({ onOpenSync, userRole = "OPERADOR" }: PlanningSc
       )}
 
       {/* =========================================================================
-          MODO GANTT MOBILE: VISUALIZAÇÃO OTIMIZADA PARA TELAS DE CELULAR
+          MODO GANTT RESPONSIVO: COLUNA FIXA + CALENDÁRIO SINCRONIZADO
          ========================================================================= */}
       {viewMode === "GANTT" ? (
         <View style={styles.ganttContainer}>
-          {/* Sub-seletor de modo do Gantt: Linha do Tempo contínua ou Sequência em Cartões */}
-          <View style={styles.subModeRow}>
-            <View style={styles.subModeSelector}>
-              <TouchableOpacity
-                style={[styles.subModeBtn, ganttSubMode === "TIMELINE" && styles.subModeBtnActive]}
-                onPress={() => setGanttSubMode("TIMELINE")}
-              >
-                <Text style={[styles.subModeBtnText, ganttSubMode === "TIMELINE" && styles.subModeBtnTextActive]}>
-                  📅 Linha do Tempo
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.subModeBtn, ganttSubMode === "SEQUENCE" && styles.subModeBtnActive]}
-                onPress={() => setGanttSubMode("SEQUENCE")}
-              >
-                <Text style={[styles.subModeBtnText, ganttSubMode === "SEQUENCE" && styles.subModeBtnTextActive]}>
-                  🔄 Sequência por Pivô
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            <Text style={styles.ganttHint}>
-              {ganttSubMode === "TIMELINE" ? "Deslize para navegar pelos meses" : "Sequência cronológica"}
-            </Text>
-          </View>
-
           {loading ? (
             <View style={styles.centered}>
               <ActivityIndicator size="large" color="#1b7d52" />
@@ -492,248 +677,319 @@ export function PlanningScreen({ onOpenSync, userRole = "OPERADOR" }: PlanningSc
             <View style={styles.centered}>
               <Text style={styles.emptyTitle}>Nenhum pivô planejado</Text>
               <Text style={styles.emptySubtitle}>
-                Cadastre planos de cultivo para visualizar as barras e períodos livres no celular.
+                Cadastre planos de cultivo para visualizar o cronograma compartilhado.
               </Text>
             </View>
-          ) : ganttSubMode === "TIMELINE" ? (
-            /* SUB-MODO 1: TIMELINE HORIZONTAL COM MESES (GANTT REAL) */
-            <ScrollView style={styles.ganttScrollVertical}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={true} style={styles.ganttScrollHorizontal}>
-                <View style={{ width: TOTAL_TIMELINE_WIDTH }}>
-                  {/* Cabeçalho de Meses */}
-                  <View style={styles.timelineHeaderRow}>
-                    {timelineMonths.map((col, idx) => (
-                      <View key={idx} style={[styles.timelineMonthCol, { width: COLUMN_WIDTH }]}>
-                        <Text style={styles.timelineMonthLabel}>{col.label}</Text>
+          ) : (
+            <View style={styles.ganttBoard}>
+              {/* CABEÇALHO FIXO COM REGISTRO DE DATAS SINCRONIZADAS */}
+              <View style={[styles.topStickyHeaderContainer, { height: HEADER_HEIGHT }]}>
+                {/* Célula de canto: Coluna de Atividades Fixa */}
+                <View style={[styles.pinnedCornerCell, { width: leftColWidth, height: HEADER_HEIGHT }]}>
+                  <Text style={styles.pinnedCornerTitle}>PIVÔ / ÁREA</Text>
+                </View>
+
+                {/* Régua de datas rolável horizontalmente */}
+                <ScrollView
+                  ref={headerScrollRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  scrollEventThrottle={16}
+                  onScroll={(e) => {
+                    if (isHeaderScrolling.current) {
+                      bodyScrollRef.current?.scrollTo({ x: e.nativeEvent.contentOffset.x, animated: false });
+                    }
+                  }}
+                  onScrollBeginDrag={() => {
+                    isHeaderScrolling.current = true;
+                  }}
+                  onScrollEndDrag={() => {
+                    setTimeout(() => {
+                      isHeaderScrolling.current = false;
+                    }, 150);
+                  }}
+                  onMomentumScrollEnd={() => {
+                    isHeaderScrolling.current = false;
+                  }}
+                  style={{ flex: 1 }}
+                >
+                  <View style={{ width: totalTimelineWidth, flexDirection: "row", height: HEADER_HEIGHT }}>
+                    {timelineCols.map((col, idx) => (
+                      <View
+                        key={col.key || idx}
+                        style={[
+                          styles.timelineColHeader,
+                          { width: col.width },
+                          col.isWeekend && styles.timelineColHeaderWeekend,
+                        ]}
+                      >
+                        <Text style={[styles.timelineColTitle, col.isToday && styles.timelineColTitleToday]}>
+                          {col.title}
+                        </Text>
+                        {col.sub && (
+                          <Text style={[styles.timelineColSub, col.isToday && styles.timelineColSubToday]}>
+                            {col.sub}
+                          </Text>
+                        )}
+                        {col.isToday && <View style={styles.todayIndicatorDot} />}
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+              </View>
+
+              {/* CORPO DO GANTT COM ROLAGEM VERTICAL: ALINHAMENTO ESTRITO DE CADA LINHA */}
+              <ScrollView
+                style={styles.ganttScrollVertical}
+                contentContainerStyle={{ flexGrow: 1 }}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={handleRefresh}
+                    colors={["#10b981"]}
+                  />
+                }
+              >
+                <View style={{ flexDirection: "row" }}>
+                  {/* COLUNA FIXA DE ATIVIDADES: FICA PRESA À ESQUERDA NO HORIZONTAL */}
+                  <View style={[styles.pinnedActivitiesCol, { width: leftColWidth }]}>
+                    {pivotGroups.map((group) => (
+                      <View key={group.pivoId} style={[styles.leftPivotCell, { height: ROW_HEIGHT }]}>
+                        <View style={styles.leftPivotCodeRow}>
+                          <Text style={styles.leftPivotCode} numberOfLines={1}>
+                            {group.codigo}
+                          </Text>
+                          {isDesktop && group.areaHa > 0 && (
+                            <View style={styles.areaBadge}>
+                              <Text style={styles.areaBadgeText}>{Math.round(group.areaHa)} ha</Text>
+                            </View>
+                          )}
+                        </View>
+                        <Text style={styles.leftPivotFarm} numberOfLines={1}>
+                          {group.fazendaNome}
+                        </Text>
+                        {!isDesktop && group.areaHa > 0 && (
+                          <Text style={styles.leftPivotAreaMini} numberOfLines={1}>
+                            {Math.round(group.areaHa)} ha
+                          </Text>
+                        )}
                       </View>
                     ))}
                   </View>
 
-                  {/* Linhas de cada Pivô */}
-                  {pivotGroups.map((group) => (
-                    <View key={group.pivoId} style={styles.timelinePivotRow}>
-                      {/* Título do Pivô no topo da linha */}
-                      <View style={styles.timelinePivotHeader}>
-                        <Text style={styles.timelinePivotCode}>{group.codigo}</Text>
-                        <Text style={styles.timelinePivotSub}>({group.fazendaNome})</Text>
-                      </View>
-
-                      {/* Trilha gráfica do Pivô */}
-                      <View style={styles.timelineTrack}>
-                        {/* Linhas de grade mensal de fundo */}
-                        {timelineMonths.map((_, idx) => (
-                          <View
-                            key={idx}
-                            style={[styles.timelineGridLine, { left: idx * COLUMN_WIDTH, width: COLUMN_WIDTH }]}
-                          />
-                        ))}
-
-                        {/* 1. BARRAS DE CULTIVO */}
-                        {group.plans.map((p) => {
-                          const pos = getPositionX(p.data_plantio, p.data_colheita_prevista);
-                          const colors = getCropColors(p.cultura_nome);
-                          const hasReal = Boolean(p.data_plantio_real);
-
-                          return (
-                            <TouchableOpacity
-                              key={p.id}
+                  {/* CALENDÁRIO HORIZONTAL ROLÁVEL COM TRILHA COMPARTILHADA */}
+                  <ScrollView
+                    ref={bodyScrollRef}
+                    horizontal
+                    showsHorizontalScrollIndicator={true}
+                    scrollEventThrottle={16}
+                    onScroll={(e) => {
+                      if (!isHeaderScrolling.current) {
+                        headerScrollRef.current?.scrollTo({ x: e.nativeEvent.contentOffset.x, animated: false });
+                      }
+                    }}
+                    onScrollBeginDrag={() => {
+                      isHeaderScrolling.current = false;
+                    }}
+                    style={{ flex: 1 }}
+                  >
+                    <View style={{ width: totalTimelineWidth }}>
+                      {pivotGroups.map((group) => (
+                        <View key={group.pivoId} style={[styles.timelineTrackRow, { height: ROW_HEIGHT }]}>
+                          {/* Grade de fundo sincronizada com as colunas */}
+                          {timelineCols.map((col, idx) => (
+                            <View
+                              key={col.key || idx}
+                              pointerEvents="none"
                               style={[
-                                styles.ganttCropBar,
+                                styles.timelineGridLine,
                                 {
-                                  left: pos.left,
-                                  width: pos.width,
-                                  backgroundColor: colors.bg,
-                                  borderColor: colors.border,
+                                  left: col.left,
+                                  width: col.width,
+                                  backgroundColor: col.isWeekend ? "#f8fafc" : "transparent",
                                 },
                               ]}
-                              onPress={() => setSelectedPlan(p)}
-                              activeOpacity={0.8}
-                            >
-                              <View style={styles.ganttBarInner}>
-                                <Text style={[styles.ganttCropText, { color: colors.text }]} numberOfLines={1}>
-                                  {p.cultura_nome}
+                            />
+                          ))}
+
+                          {/* Marcador vertical de hoje */}
+                          {todayOffset != null && (
+                            <View pointerEvents="none" style={[styles.todayVerticalLine, { left: todayOffset }]} />
+                          )}
+
+                          {/* 1. Faixas de Período Livre Entre Cultivos (com largura mínima de 58px para nunca cortar o texto) */}
+                          {group.freeIntervals.map((fp) => {
+                            const pos = getPosition(fp.start, fp.end);
+                            if (!pos) return null;
+                            const pillWidth = Math.max(pos.width, 58);
+                            const pillLeft = pos.left + (pos.width - pillWidth) / 2;
+                            return (
+                              <View
+                                key={fp.id}
+                                style={[
+                                  styles.ganttFreeInterval,
+                                  { left: pillLeft, width: pillWidth },
+                                ]}
+                              >
+                                <Text style={styles.ganttFreeText} numberOfLines={1}>
+                                  ⏱️ {fp.dias}d
                                 </Text>
-                                <Text style={styles.ganttDatesText}>
-                                  {formatShortMonth(p.data_plantio)}→{formatShortMonth(p.data_colheita_prevista)}
+                              </View>
+                            );
+                          })}
+
+                          {/* 2. Faixas de Conflito de Sobreposição */}
+                          {group.conflicts.map((conf) => {
+                            const pos = getPosition(conf.start, conf.end);
+                            if (!pos) return null;
+                            const confWidth = Math.max(pos.width, 64);
+                            const confLeft = pos.left + (pos.width - confWidth) / 2;
+                            return (
+                              <View
+                                key={conf.id}
+                                style={[
+                                  styles.ganttConflictInterval,
+                                  { left: confLeft, width: confWidth },
+                                ]}
+                              >
+                                <Text style={styles.ganttConflictText} numberOfLines={1}>
+                                  ⚠️ {conf.dias_sobreposicao}d
                                 </Text>
-                                {hasReal && (
-                                  <View style={styles.realBadgeMini}>
-                                    <Text style={styles.realBadgeMiniText}>✓ Real</Text>
+                              </View>
+                            );
+                          })}
+
+                          {/* 3. Barras dos Cultivos Agrícolas */}
+                          {group.plans.map((p) => {
+                            const pos = getPosition(p.data_plantio, p.data_colheita_prevista);
+                            if (!pos) return null;
+                            const colors = getCropColors(p.cultura_nome);
+
+                            return (
+                              <TouchableOpacity
+                                key={p.id}
+                                style={[
+                                  styles.ganttCropBar,
+                                  {
+                                    left: pos.left,
+                                    width: pos.width,
+                                    height: BAR_HEIGHT,
+                                    backgroundColor: colors.bg,
+                                    borderColor: colors.border,
+                                  },
+                                ]}
+                                onPress={() => setSelectedPlan(p)}
+                                activeOpacity={0.75}
+                                hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                              >
+                                <View style={styles.ganttBarInner}>
+                                  <View style={styles.ganttBarHeader}>
+                                    <View style={[styles.cropDotTiny, { backgroundColor: colors.border }]} />
+                                    <Text style={[styles.ganttBarCropName, { color: colors.text }]} numberOfLines={1}>
+                                      {p.cultura_nome}
+                                    </Text>
+                                    {p.data_plantio_real && (
+                                      <Text style={styles.ganttRealCheck}>✓</Text>
+                                    )}
                                   </View>
-                                )}
-                              </View>
-                            </TouchableOpacity>
-                          );
-                        })}
-
-                        {/* 2. FAIXAS DE PERÍODO LIVRE */}
-                        {group.freeIntervals.map((fp) => {
-                          const pos = getPositionX(fp.start, fp.end);
-                          return (
-                            <View
-                              key={fp.id}
-                              style={[
-                                styles.ganttFreeBar,
-                                {
-                                  left: pos.left,
-                                  width: pos.width,
-                                },
-                              ]}
-                            >
-                              <Text style={styles.ganttFreeText} numberOfLines={1}>
-                                ⏱️ LIVRE ({fp.dias}d)
-                              </Text>
-                            </View>
-                          );
-                        })}
-
-                        {/* 3. FAIXAS DE CONFLITO */}
-                        {group.conflicts.map((conf) => {
-                          const pos = getPositionX(conf.start, conf.end);
-                          return (
-                            <View
-                              key={conf.id}
-                              style={[
-                                styles.ganttConflictBar,
-                                {
-                                  left: pos.left,
-                                  width: pos.width,
-                                },
-                              ]}
-                            >
-                              <Text style={styles.ganttConflictText} numberOfLines={1}>
-                                ⚠️ CONFLITO ({conf.dias_sobreposicao}d)
-                              </Text>
-                            </View>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              </ScrollView>
-            </ScrollView>
-          ) : (
-            /* SUB-MODO 2: FLUXO DE SEQUÊNCIA CRONOLÓGICA (CARTÕES VERTICAIS) */
-            <FlatList
-              data={pivotGroups}
-              keyExtractor={(item) => item.pivoId}
-              contentContainerStyle={styles.sequenceList}
-              renderItem={({ item: group }) => (
-                <View style={styles.sequenceCard}>
-                  <View style={styles.sequenceHeader}>
-                    <View style={styles.sequencePivotTag}>
-                      <Text style={styles.sequencePivotText}>{group.codigo}</Text>
-                    </View>
-                    <Text style={styles.sequenceFarmText}>{group.fazendaNome}</Text>
-                  </View>
-
-                  {/* Trilha de Blocos Sequenciais */}
-                  <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sequenceScroll}>
-                    <View style={styles.sequenceTrackRow}>
-                      {group.plans.map((p, pIdx) => {
-                        const colors = getCropColors(p.cultura_nome);
-                        const freeAfter = group.freeIntervals.find((fp) => fp.cultura_ant === p.cultura_nome);
-                        const confAfter = group.conflicts.find((c) => c.cultura1 === p.cultura_nome);
-
-                        return (
-                          <React.Fragment key={p.id}>
-                            {/* Bloco do Cultivo */}
-                            <TouchableOpacity
-                              style={[
-                                styles.sequenceCropBlock,
-                                { backgroundColor: colors.bg, borderColor: colors.border },
-                              ]}
-                              onPress={() => setSelectedPlan(p)}
-                              activeOpacity={0.7}
-                            >
-                              <View style={styles.sequenceBlockHeader}>
-                                <Text style={[styles.sequenceCropTitle, { color: colors.text }]}>
-                                  {p.cultura_nome}
-                                </Text>
-                                <Text style={styles.sequenceAreaTag}>
-                                  {Number(p.area_planejada_ha).toFixed(0)} ha
-                                </Text>
-                              </View>
-                              <Text style={styles.sequenceDatePeriod}>
-                                {formatDate(p.data_plantio)} → {formatDate(p.data_colheita_prevista)}
-                              </Text>
-                              <View style={styles.sequenceStatusLine}>
-                                <Text style={styles.sequenceStatusText}>{p.status_display || p.status}</Text>
-                                {p.data_plantio_real && (
-                                  <Text style={styles.sequenceRealTag}>✓ Plantado</Text>
-                                )}
-                              </View>
-                            </TouchableOpacity>
-
-                            {/* Intervalo Livre Entre Cultivos */}
-                            {freeAfter && (
-                              <View style={styles.sequenceFreeBlock}>
-                                <Text style={styles.sequenceFreeIcon}>⏱️</Text>
-                                <Text style={styles.sequenceFreeTitle}>LIVRE</Text>
-                                <Text style={styles.sequenceFreeDays}>{freeAfter.dias} dias</Text>
-                              </View>
-                            )}
-
-                            {/* Alerta de Conflito */}
-                            {confAfter && (
-                              <View style={styles.sequenceConflictBlock}>
-                                <Text style={styles.sequenceConflictIcon}>⚠️</Text>
-                                <Text style={styles.sequenceConflictTitle}>CONFLITO</Text>
-                                <Text style={styles.sequenceConflictDays}>{confAfter.dias_sobreposicao} dias</Text>
-                              </View>
-                            )}
-
-                            {/* Marcador final se for o último cultivo */}
-                            {pIdx === group.plans.length - 1 && (
-                              <View style={styles.sequenceEndBlock}>
-                                <Text style={styles.sequenceEndIcon}>📅</Text>
-                                <Text style={styles.sequenceEndText}>Sem plano futuro</Text>
-                              </View>
-                            )}
-                          </React.Fragment>
-                        );
-                      })}
+                                  <Text style={[styles.ganttBarDuration, { color: colors.text }]} numberOfLines={1}>
+                                    {pos.days}d {pos.width > 75 ? `• ${formatShortMonth(p.data_plantio)}` : ""}
+                                  </Text>
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      ))}
                     </View>
                   </ScrollView>
                 </View>
-              )}
-            />
+
+                {/* PAINEL OPERACIONAL INFERIOR: PREENCHE O ESPAÇO COM MÉTRICAS ÚTEIS */}
+                <View style={styles.cockpitSummarySection}>
+                  <View style={styles.summaryTitleRow}>
+                    <Text style={styles.summarySectionTitle}>Resumo Operacional</Text>
+                    <Text style={styles.summarySectionSub}>Visão geral dos cultivos e áreas</Text>
+                  </View>
+
+                  <View style={styles.summaryCardsGrid}>
+                    <View style={styles.summaryKpiCard}>
+                      <Text style={styles.summaryKpiValue}>{pivotGroups.length}</Text>
+                      <Text style={styles.summaryKpiLabel}>Pivôs Ativos</Text>
+                    </View>
+
+                    <View style={styles.summaryKpiCard}>
+                      <Text style={[styles.summaryKpiValue, { color: "#059669" }]}>
+                        {Math.round(totalPlannedArea)} <Text style={styles.summaryKpiUnit}>ha</Text>
+                      </Text>
+                      <Text style={styles.summaryKpiLabel}>Área Total</Text>
+                    </View>
+
+                    <View style={styles.summaryKpiCard}>
+                      <Text style={[styles.summaryKpiValue, { color: "#2563eb" }]}>{activePlansCount}</Text>
+                      <Text style={styles.summaryKpiLabel}>Cultivos</Text>
+                    </View>
+
+                    <View style={styles.summaryKpiCard}>
+                      <Text style={[styles.summaryKpiValue, { color: totalFreeIntervalsCount > 0 ? "#d97706" : "#64748b" }]}>
+                        {totalFreeIntervalsCount}
+                      </Text>
+                      <Text style={styles.summaryKpiLabel}>Janelas Livres</Text>
+                    </View>
+                  </View>
+                </View>
+              </ScrollView>
+            </View>
           )}
 
-          {/* Legenda Resumida no Rodapé do Mobile */}
+          {/* Legenda Resumida no Rodapé */}
           <View style={styles.mobileLegend}>
             <View style={styles.legendItem}>
               <View style={[styles.legendDot, { backgroundColor: "#10b981" }]} />
               <Text style={styles.legendText}>Cultivo</Text>
             </View>
             <View style={styles.legendItem}>
-              <View style={[styles.legendBox, { backgroundColor: "#f1f5f9", borderColor: "#cbd5e1" }]} />
-              <Text style={styles.legendText}>Livre (dias)</Text>
+              <Text style={styles.legendTextBold}>✓</Text>
+              <Text style={styles.legendText}>Plantado</Text>
             </View>
             <View style={styles.legendItem}>
-              <View style={[styles.legendBox, { backgroundColor: "#fee2e2", borderColor: "#f87171" }]} />
+              <View style={[styles.legendBox, { backgroundColor: "#f8fafc", borderColor: "#94a3b8" }]} />
+              <Text style={styles.legendText}>Livre</Text>
+            </View>
+            <View style={styles.legendItem}>
+              <View style={[styles.legendBox, { backgroundColor: "#fef2f2", borderColor: "#ef4444" }]} />
               <Text style={styles.legendText}>Conflito</Text>
             </View>
-            <View style={styles.legendItem}>
-              <Text style={styles.legendText}>✓ Realizado</Text>
-            </View>
+            {todayOffset != null && (
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: "#ef4444" }]} />
+                <Text style={styles.legendText}>Hoje</Text>
+              </View>
+            )}
           </View>
         </View>
       ) : (
         /* =========================================================================
-            MODO LISTA PADRÃO
+            MODO LISTA PADRÃO (TELA DE PLANEJAMENTO)
            ========================================================================= */
         <View style={styles.listContainer}>
-          {/* Busca Rápida */}
-          <View style={styles.searchContainer}>
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Buscar cultura, alvo, safra, fazenda..."
-              placeholderTextColor="#94a3b8"
-              value={search}
-              onChangeText={setSearch}
-            />
+          {/* Busca Rápida Padronizada */}
+          <View style={styles.searchBarContainer}>
+            <View style={styles.searchBox}>
+              <Search size={18} color="#94a3b8" />
+              <TextInput
+                style={styles.searchInput}
+                placeholder="Buscar cultura, alvo, safra, fazenda..."
+                placeholderTextColor="#94a3b8"
+                value={search}
+                onChangeText={setSearch}
+              />
+              {search.length > 0 && (
+                <TouchableOpacity onPress={() => setSearch("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                  <X size={16} color="#94a3b8" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           {/* Filtros de Status */}
@@ -766,25 +1022,32 @@ export function PlanningScreen({ onOpenSync, userRole = "OPERADOR" }: PlanningSc
               data={filteredPlans}
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.listContent}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  colors={["#10b981"]}
+                />
+              }
               renderItem={({ item }) => {
                 const colors = getCropColors(item.cultura_nome);
                 const planConflict = getConflictForPlan(item.id);
 
                 return (
                   <TouchableOpacity
-                    style={[styles.planCard, planConflict && styles.planCardConflict]}
+                    style={[
+                      styles.planCard,
+                      isDesktop && styles.planCardDesktop,
+                      planConflict && styles.planCardConflict,
+                    ]}
                     onPress={() => setSelectedPlan(item)}
-                    activeOpacity={0.7}
+                    activeOpacity={0.8}
                   >
                     <View style={styles.cardHeader}>
                       <View style={styles.cropTitleGroup}>
+                        <View style={[styles.cropDotMini, { backgroundColor: colors.border }]} />
                         <Text style={styles.cropName}>{item.cultura_nome}</Text>
                         <Text style={styles.targetName}>• {item.alvo_nome}</Text>
-                        {planConflict && (
-                          <View style={styles.cardConflictBadge}>
-                            <Text style={styles.cardConflictBadgeText}>⚠️ CONFLITO</Text>
-                          </View>
-                        )}
                       </View>
                       <View style={[styles.statusBadge, { backgroundColor: colors.bg, borderColor: colors.border }]}>
                         <Text style={[styles.statusBadgeText, { color: colors.text }]}>
@@ -793,25 +1056,36 @@ export function PlanningScreen({ onOpenSync, userRole = "OPERADOR" }: PlanningSc
                       </View>
                     </View>
 
-                    <View style={styles.cardDetails}>
-                      <Text style={styles.metaText}>
-                        Fazenda: <Text style={styles.metaBold}>{item.fazenda_nome}</Text>
-                      </Text>
-                      <Text style={styles.metaText}>
-                        Safra: <Text style={styles.metaBold}>{item.safra_nome}</Text>
-                      </Text>
+                    {planConflict && (
+                      <View style={styles.cardConflictBadge}>
+                        <Text style={styles.cardConflictBadgeText}>⚠️ Sobreposição de período com outro cultivo</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.cardDetailsGrid}>
+                      <View style={styles.detailCol}>
+                        <Text style={styles.detailColLabel}>Fazenda</Text>
+                        <Text style={styles.detailColValue} numberOfLines={1}>{item.fazenda_nome || "—"}</Text>
+                      </View>
+                      <View style={styles.detailCol}>
+                        <Text style={styles.detailColLabel}>Safra</Text>
+                        <Text style={styles.detailColValue} numberOfLines={1}>{item.safra_nome || "—"}</Text>
+                      </View>
+                      <View style={styles.detailCol}>
+                        <Text style={styles.detailColLabel}>Área</Text>
+                        <Text style={styles.detailColValue}>{Number(item.area_planejada_ha).toFixed(0)} ha</Text>
+                      </View>
                     </View>
 
-                    <View style={styles.cardFooter}>
-                      <View style={styles.dateGroup}>
-                        <Text style={styles.dateLabel}>Previsto: {formatDate(item.data_plantio)} → {formatDate(item.data_colheita_prevista)}</Text>
-                        {item.data_plantio_real && (
-                          <Text style={[styles.dateLabel, { color: "#059669", fontWeight: "600" }]}>
-                            Plantio Real: {formatDate(item.data_plantio_real)}
-                          </Text>
-                        )}
-                      </View>
-                      <Text style={styles.areaBadge}>{Number(item.area_planejada_ha).toFixed(1)} ha</Text>
+                    <View style={styles.cardFooterDates}>
+                      <Text style={styles.dateRangeText}>
+                        Previsto: {formatDate(item.data_plantio)} → {formatDate(item.data_colheita_prevista)}
+                      </Text>
+                      {item.data_plantio_real && (
+                        <View style={styles.realPlantTag}>
+                          <Text style={styles.realPlantTagText}>✓ Plantado</Text>
+                        </View>
+                      )}
                     </View>
                   </TouchableOpacity>
                 );
@@ -821,7 +1095,7 @@ export function PlanningScreen({ onOpenSync, userRole = "OPERADOR" }: PlanningSc
         </View>
       )}
 
-      {/* 4. Modal de Detalhes do Plano & Operações */}
+      {/* 3. Modal de Detalhes do Plano & Operações */}
       {selectedPlan && (
         <Modal
           visible={!!selectedPlan}
@@ -965,89 +1239,144 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8fafc",
   },
-  syncBar: {
-    backgroundColor: "#132a22",
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  syncInfo: {
-    flex: 1,
-  },
-  syncTitle: {
-    color: "#ffffff",
-    fontSize: 15,
-    fontWeight: "bold",
-  },
-  syncSubRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginTop: 2,
-  },
-  syncSubtitle: {
-    color: "#a7f3d0",
-    fontSize: 11,
-  },
-  syncConflictBadge: {
-    backgroundColor: "#ef4444",
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 8,
-  },
-  syncConflictBadgeText: {
-    color: "#ffffff",
-    fontSize: 10,
-    fontWeight: "bold",
-  },
-  syncButton: {
-    backgroundColor: "#1b7d52",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  syncButtonText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-
-  // View Mode Tabs
-  viewModeBar: {
-    flexDirection: "row",
+  topHeader: {
     backgroundColor: "#ffffff",
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
   },
-  viewModeTab: {
-    flex: 1,
-    paddingVertical: 10,
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
-    borderBottomWidth: 2,
-    borderBottomColor: "transparent",
   },
-  viewModeTabActive: {
-    borderBottomColor: "#1b7d52",
+  screenTitleGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  screenIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  screenTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#0f172a",
+    letterSpacing: -0.3,
+  },
+  screenSubtitle: {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 2,
+    fontWeight: "500",
+  },
+
+  // Barra de Controles do Cronograma (Navegação & Escala)
+  timelineControlBar: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
+  },
+  navControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+  },
+  navArrowBtn: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  navArrowText: {
+    fontSize: 10,
+    color: "#334155",
+    fontWeight: "bold",
+  },
+  todayBtn: {
+    paddingHorizontal: 8,
+    height: 28,
+    borderRadius: 6,
     backgroundColor: "#f0fdf4",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  viewModeTabText: {
-    fontSize: 12,
+  todayBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#166534",
+  },
+  periodLabel: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#334155",
+    marginLeft: 4,
+    flexShrink: 1,
+  },
+  scaleSelector: {
+    flexDirection: "row",
+    backgroundColor: "#f1f5f9",
+    borderRadius: 6,
+    padding: 2,
+  },
+  scaleBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 5,
+  },
+  scaleBtnActive: {
+    backgroundColor: "#1b7d52",
+  },
+  scaleBtnText: {
+    fontSize: 10,
     fontWeight: "600",
     color: "#64748b",
   },
-  viewModeTabTextActive: {
-    color: "#1b7d52",
+  scaleBtnTextActive: {
+    color: "#ffffff",
     fontWeight: "bold",
+  },
+
+  // Alerta de conflito
+  conflictAlertBanner: {
+    backgroundColor: "#fef2f2",
+    borderColor: "#fecaca",
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  conflictAlertText: {
+    color: "#dc2626",
+    fontSize: 11,
+    fontWeight: "700",
   },
 
   // Chips de Fazenda
   filterChipScroll: {
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
-    maxHeight: 44,
+    borderBottomColor: "#e2e8f0",
+    maxHeight: 40,
   },
   filterChipContent: {
     paddingHorizontal: 12,
@@ -1055,9 +1384,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   chipPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 14,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     backgroundColor: "#f1f5f9",
   },
   chipPillActive: {
@@ -1072,102 +1401,125 @@ const styles = StyleSheet.create({
     color: "#ffffff",
   },
 
-  // Gantt Container & Sub-modos
+  // Gantt Responsivo
   ganttContainer: {
     flex: 1,
   },
-  subModeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
-  },
-  subModeSelector: {
-    flexDirection: "row",
-    backgroundColor: "#f1f5f9",
-    borderRadius: 8,
-    padding: 2,
-  },
-  subModeBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  subModeBtnActive: {
-    backgroundColor: "#ffffff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 1,
-    elevation: 1,
-  },
-  subModeBtnText: {
-    fontSize: 11,
-    color: "#64748b",
-    fontWeight: "500",
-  },
-  subModeBtnTextActive: {
-    color: "#0f172a",
-    fontWeight: "bold",
-  },
-  ganttHint: {
-    fontSize: 10,
-    color: "#94a3b8",
-  },
-
-  // Linha do tempo horizontal (Timeline Gantt)
-  ganttScrollVertical: {
+  ganttBoard: {
     flex: 1,
   },
-  ganttScrollHorizontal: {
-    flex: 1,
-  },
-  timelineHeaderRow: {
+  topStickyHeaderContainer: {
     flexDirection: "row",
     backgroundColor: "#f8fafc",
     borderBottomWidth: 1,
     borderBottomColor: "#cbd5e1",
+    zIndex: 10,
   },
-  timelineMonthCol: {
-    paddingVertical: 8,
+  pinnedCornerCell: {
+    backgroundColor: "#f8fafc",
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    borderRightWidth: 1,
+    borderRightColor: "#cbd5e1",
+  },
+  pinnedCornerTitle: {
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#475569",
+    letterSpacing: 0.4,
+  },
+  timelineColHeader: {
+    justifyContent: "center",
     alignItems: "center",
     borderRightWidth: 1,
     borderRightColor: "#e2e8f0",
+    paddingHorizontal: 2,
+    position: "relative",
   },
-  timelineMonthLabel: {
+  timelineColHeaderWeekend: {
+    backgroundColor: "#f1f5f9",
+  },
+  timelineColTitle: {
     fontSize: 11,
-    fontWeight: "bold",
+    fontWeight: "700",
     color: "#475569",
   },
-  timelinePivotRow: {
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
-    paddingVertical: 6,
+  timelineColTitleToday: {
+    color: "#166534",
+    fontWeight: "900",
   },
-  timelinePivotHeader: {
+  timelineColSub: {
+    fontSize: 9,
+    color: "#94a3b8",
+    marginTop: 1,
+  },
+  timelineColSubToday: {
+    color: "#059669",
+    fontWeight: "700",
+  },
+  todayIndicatorDot: {
+    position: "absolute",
+    bottom: 2,
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "#ef4444",
+  },
+
+  // Rolagem vertical e trilhas
+  ganttScrollVertical: {
+    flex: 1,
+  },
+  pinnedActivitiesCol: {
+    backgroundColor: "#ffffff",
+    borderRightWidth: 1,
+    borderRightColor: "#cbd5e1",
+    zIndex: 5,
+  },
+  leftPivotCell: {
+    justifyContent: "center",
+    paddingHorizontal: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  leftPivotCodeRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    marginBottom: 4,
+    justifyContent: "space-between",
+    gap: 4,
   },
-  timelinePivotCode: {
+  leftPivotCode: {
     fontSize: 12,
-    fontWeight: "bold",
+    fontWeight: "800",
     color: "#0f172a",
   },
-  timelinePivotSub: {
-    fontSize: 11,
+  areaBadge: {
+    backgroundColor: "#f1f5f9",
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  areaBadgeText: {
+    fontSize: 9,
+    fontWeight: "600",
     color: "#64748b",
   },
-  timelineTrack: {
-    height: 48,
+  leftPivotFarm: {
+    fontSize: 10,
+    color: "#64748b",
+    marginTop: 1,
+  },
+  leftPivotAreaMini: {
+    fontSize: 9,
+    fontWeight: "600",
+    color: "#059669",
+    marginTop: 1,
+  },
+  timelineTrackRow: {
     position: "relative",
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+    justifyContent: "center",
   },
   timelineGridLine: {
     position: "absolute",
@@ -1176,91 +1528,105 @@ const styles = StyleSheet.create({
     borderRightWidth: 1,
     borderRightColor: "#f1f5f9",
   },
+  todayVerticalLine: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    width: 2,
+    backgroundColor: "#ef4444",
+    zIndex: 4,
+  },
+
+  // Barras e Faixas
   ganttCropBar: {
     position: "absolute",
-    top: 4,
-    bottom: 4,
     borderRadius: 6,
-    borderWidth: 1,
+    borderWidth: 1.5,
     paddingHorizontal: 6,
-    paddingVertical: 2,
     justifyContent: "center",
+    zIndex: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 1,
-    elevation: 1,
+    shadowOpacity: 0.08,
+    shadowRadius: 1.5,
+    elevation: 2,
   },
   ganttBarInner: {
+    justifyContent: "center",
+  },
+  ganttBarHeader: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     gap: 4,
   },
-  ganttCropText: {
-    fontSize: 10,
-    fontWeight: "bold",
-  },
-  ganttDatesText: {
-    fontSize: 9,
-    color: "#64748b",
-  },
-  realBadgeMini: {
-    backgroundColor: "#059669",
-    paddingHorizontal: 3,
-    paddingVertical: 1,
+  cropDotTiny: {
+    width: 6,
+    height: 6,
     borderRadius: 3,
   },
-  realBadgeMiniText: {
-    color: "#ffffff",
-    fontSize: 8,
-    fontWeight: "bold",
+  ganttBarCropName: {
+    fontSize: 11,
+    fontWeight: "800",
+    flexShrink: 1,
   },
-  ganttFreeBar: {
+  ganttRealCheck: {
+    fontSize: 9,
+    fontWeight: "900",
+    color: "#059669",
+  },
+  ganttBarDuration: {
+    fontSize: 9,
+    fontWeight: "600",
+    marginTop: 1,
+    opacity: 0.85,
+  },
+  ganttFreeInterval: {
     position: "absolute",
-    top: 10,
-    bottom: 10,
-    borderRadius: 4,
-    borderWidth: 1,
+    height: 24,
+    borderRadius: 6,
+    borderWidth: 1.5,
     borderStyle: "dashed",
-    borderColor: "#94a3b8",
-    backgroundColor: "#f1f5f9",
+    borderColor: "#334155",
+    backgroundColor: "#ffffff",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
+    zIndex: 10,
+    elevation: 3,
   },
   ganttFreeText: {
-    fontSize: 9,
-    fontWeight: "bold",
-    color: "#475569",
+    fontSize: 10,
+    fontWeight: "800",
+    color: "#0f172a",
+    textAlign: "center",
   },
-  ganttConflictBar: {
+  ganttConflictInterval: {
     position: "absolute",
-    top: 8,
-    bottom: 8,
-    borderRadius: 4,
-    borderWidth: 1,
+    height: 26,
+    borderRadius: 6,
+    borderWidth: 1.5,
     borderColor: "#ef4444",
     backgroundColor: "#fee2e2",
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: 4,
+    paddingHorizontal: 6,
+    zIndex: 12,
+    elevation: 4,
   },
   ganttConflictText: {
     fontSize: 9,
-    fontWeight: "bold",
+    fontWeight: "800",
     color: "#b91c1c",
   },
 
-  // Modo Sequência em Cartões (Vertical)
-  sequenceList: {
-    padding: 12,
-    gap: 10,
-  },
-  sequenceCard: {
+  // Painel de Resumo Operacional abaixo do Gantt
+  cockpitSummarySection: {
     backgroundColor: "#ffffff",
-    borderRadius: 10,
-    padding: 12,
+    marginHorizontal: 12,
+    marginTop: 14,
+    marginBottom: 20,
+    padding: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#e2e8f0",
     shadowColor: "#000",
@@ -1269,153 +1635,66 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 1,
   },
-  sequenceHeader: {
+  summaryTitleRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 8,
+    marginBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+    paddingBottom: 8,
   },
-  sequencePivotTag: {
-    backgroundColor: "#f0fdf4",
-    borderColor: "#bbf7d0",
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+  summarySectionTitle: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: "#0f172a",
   },
-  sequencePivotText: {
-    fontSize: 12,
-    fontWeight: "bold",
-    color: "#166534",
-  },
-  sequenceFarmText: {
-    fontSize: 11,
+  summarySectionSub: {
+    fontSize: 10,
     color: "#64748b",
   },
-  sequenceScroll: {
-    paddingVertical: 2,
-  },
-  sequenceTrackRow: {
+  summaryCardsGrid: {
     flexDirection: "row",
-    alignItems: "center",
+    justifyContent: "space-between",
     gap: 8,
   },
-  sequenceCropBlock: {
-    borderWidth: 1,
+  summaryKpiCard: {
+    flex: 1,
+    backgroundColor: "#f8fafc",
     borderRadius: 8,
-    padding: 10,
-    minWidth: 140,
-  },
-  sequenceBlockHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 4,
     alignItems: "center",
-    marginBottom: 4,
+    borderWidth: 1,
+    borderColor: "#f1f5f9",
   },
-  sequenceCropTitle: {
-    fontSize: 13,
-    fontWeight: "bold",
+  summaryKpiValue: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#0f172a",
   },
-  sequenceAreaTag: {
+  summaryKpiUnit: {
     fontSize: 10,
-    color: "#64748b",
-  },
-  sequenceDatePeriod: {
-    fontSize: 10,
-    color: "#475569",
-    marginBottom: 4,
-  },
-  sequenceStatusLine: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  sequenceStatusText: {
-    fontSize: 9,
     fontWeight: "600",
     color: "#64748b",
   },
-  sequenceRealTag: {
-    fontSize: 9,
-    fontWeight: "bold",
-    color: "#059669",
-    backgroundColor: "#d1fae5",
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 3,
-  },
-  sequenceFreeBlock: {
-    borderWidth: 1,
-    borderStyle: "dashed",
-    borderColor: "#cbd5e1",
-    backgroundColor: "#f8fafc",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 80,
-  },
-  sequenceFreeIcon: {
-    fontSize: 12,
-    marginBottom: 2,
-  },
-  sequenceFreeTitle: {
-    fontSize: 10,
-    fontWeight: "bold",
-    color: "#475569",
-  },
-  sequenceFreeDays: {
+  summaryKpiLabel: {
     fontSize: 9,
     color: "#64748b",
-  },
-  sequenceConflictBlock: {
-    borderWidth: 1,
-    borderColor: "#fca5a5",
-    backgroundColor: "#fef2f2",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 80,
-  },
-  sequenceConflictIcon: {
-    fontSize: 12,
-  },
-  sequenceConflictTitle: {
-    fontSize: 9,
-    fontWeight: "bold",
-    color: "#b91c1c",
-  },
-  sequenceConflictDays: {
-    fontSize: 8,
-    color: "#991b1b",
-  },
-  sequenceEndBlock: {
-    borderWidth: 1,
-    borderStyle: "dotted",
-    borderColor: "#e2e8f0",
-    borderRadius: 8,
-    paddingHorizontal: 8,
-    paddingVertical: 8,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sequenceEndIcon: {
-    fontSize: 11,
-  },
-  sequenceEndText: {
-    fontSize: 9,
-    color: "#94a3b8",
-    fontStyle: "italic",
+    marginTop: 2,
+    fontWeight: "500",
+    textAlign: "center",
   },
 
-  // Legenda no rodapé
+  // Legenda
   mobileLegend: {
     flexDirection: "row",
-    justifyContent: "space-around",
-    paddingVertical: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 12,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
     backgroundColor: "#ffffff",
     borderTopWidth: 1,
     borderTopColor: "#e2e8f0",
@@ -1431,48 +1710,64 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   legendBox: {
-    width: 12,
-    height: 8,
-    borderWidth: 1,
+    width: 10,
+    height: 10,
     borderRadius: 2,
+    borderWidth: 1,
   },
   legendText: {
     fontSize: 10,
     color: "#64748b",
+    fontWeight: "500",
+  },
+  legendTextBold: {
+    fontSize: 10,
+    color: "#059669",
+    fontWeight: "bold",
   },
 
   // Modo Lista
   listContainer: {
     flex: 1,
   },
-  searchContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+  searchBarContainer: {
     backgroundColor: "#ffffff",
+    paddingHorizontal: 12,
+    paddingTop: 8,
+    paddingBottom: 6,
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
   },
-  searchInput: {
-    backgroundColor: "#f1f5f9",
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
     borderRadius: 8,
     paddingHorizontal: 12,
-    paddingVertical: 8,
+    height: 40,
+    gap: 8,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+  },
+  searchInput: {
+    flex: 1,
     fontSize: 13,
     color: "#0f172a",
+    paddingVertical: 0,
   },
   filtersContainer: {
     flexDirection: "row",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
     backgroundColor: "#ffffff",
-    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    gap: 6,
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
   },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
     backgroundColor: "#f1f5f9",
   },
   filterChipActive: {
@@ -1481,31 +1776,35 @@ const styles = StyleSheet.create({
   filterChipText: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#64748b",
+    color: "#475569",
   },
   filterChipTextActive: {
     color: "#ffffff",
   },
   listContent: {
-    padding: 16,
-    gap: 12,
+    padding: 12,
+    gap: 10,
   },
   planCard: {
     backgroundColor: "#ffffff",
     borderRadius: 10,
-    padding: 14,
+    padding: 12,
     borderWidth: 1,
     borderColor: "#e2e8f0",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
+    shadowOpacity: 0.04,
     shadowRadius: 2,
-    elevation: 2,
-    marginBottom: 8,
+    elevation: 1,
+  },
+  planCardDesktop: {
+    maxWidth: 960,
+    width: "100%",
+    alignSelf: "center",
   },
   planCardConflict: {
-    borderColor: "#fca5a5",
-    backgroundColor: "#fffafa",
+    borderColor: "#f87171",
+    borderWidth: 1.5,
   },
   cardHeader: {
     flexDirection: "row",
@@ -1516,76 +1815,87 @@ const styles = StyleSheet.create({
   cropTitleGroup: {
     flexDirection: "row",
     alignItems: "center",
-    flex: 1,
     gap: 6,
+    flex: 1,
+  },
+  cropDotMini: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
   },
   cropName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: "bold",
     color: "#0f172a",
   },
   targetName: {
-    fontSize: 13,
+    fontSize: 12,
     color: "#64748b",
   },
   statusBadge: {
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
+    paddingVertical: 2,
+    borderRadius: 6,
     borderWidth: 1,
   },
   statusBadgeText: {
     fontSize: 10,
-    fontWeight: "700",
+    fontWeight: "bold",
   },
-  cardDetails: {
+  cardConflictBadge: {
+    backgroundColor: "#fef2f2",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginBottom: 8,
+  },
+  cardConflictBadgeText: {
+    color: "#b91c1c",
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  cardDetailsGrid: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 10,
-    paddingTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: "#f8fafc",
+    backgroundColor: "#f8fafc",
+    borderRadius: 6,
+    padding: 8,
+    marginBottom: 8,
   },
-  metaText: {
-    fontSize: 12,
+  detailCol: {
+    flex: 1,
+  },
+  detailColLabel: {
+    fontSize: 9,
     color: "#64748b",
-  },
-  metaBold: {
+    textTransform: "uppercase",
     fontWeight: "600",
-    color: "#1e293b",
   },
-  cardFooter: {
+  detailColValue: {
+    fontSize: 11,
+    fontWeight: "bold",
+    color: "#0f172a",
+    marginTop: 1,
+  },
+  cardFooterDates: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
-    padding: 8,
-    borderRadius: 6,
   },
-  dateGroup: {
-    gap: 2,
-  },
-  dateLabel: {
+  dateRangeText: {
     fontSize: 11,
     color: "#475569",
   },
-  areaBadge: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#1b7d52",
-  },
-  cardConflictBadge: {
-    backgroundColor: "#fee2e2",
-    borderColor: "#fca5a5",
-    borderWidth: 1,
+  realPlantTag: {
+    backgroundColor: "#ecfdf5",
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 8,
+    borderRadius: 4,
   },
-  cardConflictBadgeText: {
-    color: "#991b1b",
+  realPlantTagText: {
     fontSize: 9,
     fontWeight: "bold",
+    color: "#059669",
   },
 
   // Modal

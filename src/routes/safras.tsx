@@ -250,30 +250,26 @@ function SafrasPage() {
   });
 
   return (
-    <div className="flex-1 space-y-4 p-2 sm:p-4 lg:p-6 w-full">
-      {/* Cabeçalho */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
-              <Calendar className="size-5" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
-                  Gestão Agronômica
-                </span>
-                <span className="inline-block size-1 rounded-full bg-primary" />
-                <span className="text-[11px] text-muted-foreground">Ciclos Produtivos</span>
-              </div>
-              <h1 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+    <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 w-full max-w-[1600px] mx-auto">
+      {/* Cabeçalho Padronizado */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="grid size-11 place-items-center rounded-xl bg-primary/10 border border-primary/20 text-primary shadow-xs">
+            <Calendar className="size-5" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
                 Cadastro de Safras
               </h1>
+              <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground border border-border/40">
+                {seasons.length}
+              </span>
             </div>
+            <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+              Cadastre e acompanhe os ciclos e anos agrícolas para o planejamento de plantio.
+            </p>
           </div>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Cadastre e acompanhe os ciclos e anos agrícolas para o planejamento de plantio
-          </p>
         </div>
 
         <div className="flex items-center gap-2">
@@ -282,7 +278,7 @@ function SafrasPage() {
             size="sm"
             onClick={loadData}
             disabled={isLoading}
-            className="h-9 gap-1.5 text-xs cursor-pointer"
+            className="h-9 gap-1.5 text-xs font-medium cursor-pointer shadow-xs"
             title="Atualizar lista de safras"
           >
             <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} />
@@ -292,7 +288,7 @@ function SafrasPage() {
           <Button
             size="sm"
             onClick={handleOpenCreate}
-            className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-sm"
+            className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             <Plus className="size-4" />
             Nova Safra

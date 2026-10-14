@@ -681,11 +681,11 @@ export function PivotPlanningGantt({
                               return (
                                 <div
                                   key={fp.id}
-                                  style={{ left: pos.left, width: pos.width }}
-                                  className="absolute top-2.5 bottom-2.5 z-0 rounded border border-dashed border-zinc-400/80 bg-zinc-200/50 dark:bg-zinc-800/40 px-1.5 flex items-center justify-center text-[10px] font-semibold text-zinc-600 dark:text-zinc-400 overflow-hidden shadow-xs hover:bg-zinc-200/80 transition-colors"
+                                  style={{ left: pos.left, width: pos.width, minWidth: "76px" }}
+                                  className="absolute top-2.5 bottom-2.5 z-10 rounded border border-dashed border-zinc-400 bg-zinc-100/95 dark:bg-zinc-800/95 px-1.5 flex items-center justify-center text-[10px] font-bold text-zinc-700 dark:text-zinc-200 shadow-xs whitespace-nowrap hover:bg-zinc-200 transition-colors"
                                   title={`Intervalo Livre: ${fp.dias_livres} dias (${fp.start} a ${fp.end})\nEntre ${fp.cultura_anterior} e ${fp.cultura_proxima}`}
                                 >
-                                  <span className="flex items-center gap-1 truncate">
+                                  <span className="flex items-center gap-1 shrink-0">
                                     <Clock className="size-2.5 shrink-0 opacity-70" />
                                     <span>LIVRE ({fp.dias_livres}d)</span>
                                   </span>
@@ -701,11 +701,11 @@ export function PivotPlanningGantt({
                               return (
                                 <div
                                   key={conf.id}
-                                  style={{ left: pos.left, width: pos.width }}
-                                  className="absolute top-1 bottom-1 z-20 rounded border-2 border-rose-500 bg-rose-500/25 px-1.5 flex items-center justify-center text-[10px] font-bold text-rose-700 dark:text-rose-300 overflow-hidden animate-pulse shadow-sm"
+                                  style={{ left: pos.left, width: pos.width, minWidth: "84px" }}
+                                  className="absolute top-1 bottom-1 z-20 rounded border-2 border-rose-500 bg-rose-500/30 px-1.5 flex items-center justify-center text-[10px] font-bold text-rose-700 dark:text-rose-300 animate-pulse shadow-sm whitespace-nowrap"
                                   title={conf.mensagem}
                                 >
-                                  <span className="flex items-center gap-1 truncate">
+                                  <span className="flex items-center gap-1 shrink-0">
                                     <AlertTriangle className="size-3 text-rose-600 shrink-0" />
                                     <span>CONFLITO ({conf.dias_sobreposicao}d)</span>
                                   </span>

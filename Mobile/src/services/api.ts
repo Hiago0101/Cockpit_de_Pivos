@@ -18,8 +18,19 @@ export const setOnUnauthorized = (callback: () => void) => {
   onUnauthorizedCallback = callback;
 };
 
+export const normalizeApiUrl = (url: string): string => {
+  let cleaned = url.trim().replace(/\/+$/, "");
+  if (!cleaned.startsWith("http://") && !cleaned.startsWith("https://")) {
+    cleaned = `http://${cleaned}`;
+  }
+  if (!cleaned.includes("/api/v1")) {
+    cleaned = `${cleaned}/api/v1`;
+  }
+  return cleaned;
+};
+
 export const setApiUrl = async (url: string) => {
-  apiBaseUrl = url.trim().replace(/\/+$/, "");
+  apiBaseUrl = normalizeApiUrl(url);
   await secureStorage.saveApiUrl(apiBaseUrl);
 };
 

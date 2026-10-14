@@ -15,6 +15,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='cultura',
             name='talhao',
-            field=models.ForeignKey(help_text='Talhão vinculado (obrigatório)', on_delete=django.db.models.deletion.PROTECT, related_name='culturas', to='pivots.talhao'),
+            field=models.ForeignKey(blank=True, help_text='Talhão vinculado (obrigatório)', null=True, on_delete=django.db.models.deletion.PROTECT, related_name='culturas', to='pivots.talhao'),
         ),
     ]
+

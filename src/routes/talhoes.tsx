@@ -235,39 +235,45 @@ function TalhoesPage() {
   });
 
   return (
-    <div className="flex-1 space-y-6 p-6 sm:p-8">
-      {/* Cabeçalho */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
-              <Grid3x3 className="size-5" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              Cadastro de Talhões
-            </h1>
+    <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 w-full max-w-[1600px] mx-auto">
+      {/* Cabeçalho Padronizado */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="grid size-11 place-items-center rounded-xl bg-primary/10 border border-primary/20 text-primary shadow-xs">
+            <Grid3x3 className="size-5" />
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Gerencie os talhões agrícolas vinculados às suas fazendas, códigos e descrições operacionais.
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                Cadastro de Talhões
+              </h1>
+              <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground border border-border/40">
+                {fields.length}
+              </span>
+            </div>
+            <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+              Gerencie os talhões agrícolas vinculados às suas fazendas, códigos e descrições operacionais.
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={loadData}
             disabled={isLoading}
-            className="cursor-pointer gap-1.5"
+            className="h-9 gap-1.5 text-xs font-medium cursor-pointer shadow-xs"
+            title="Atualizar lista de talhões"
           >
             <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} />
-            Atualizar
+            <span className="hidden sm:inline">Atualizar</span>
           </Button>
 
           <Button
             size="sm"
             onClick={handleOpenCreate}
-            className="cursor-pointer gap-1.5 font-semibold shadow-sm"
+            className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             <Plus className="size-4" />
             Novo Talhão
@@ -293,80 +299,78 @@ function TalhoesPage() {
         </div>
       )}
 
-      {/* Barra de Busca e Filtros */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-        <div className="flex flex-1 flex-col sm:flex-row items-center gap-2.5 max-w-2xl">
-          {/* Busca textual */}
-          <div className="relative flex-1 w-full">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Buscar por Código, Descrição, Fazenda ou ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 h-10 text-sm bg-background w-full"
-            />
-          </div>
-
-          {/* Filtro por Fazenda */}
-          {farms.length > 0 && (
-            <div className="relative w-full sm:w-64 shrink-0">
-              <select
-                aria-label="Filtrar por Fazenda"
-                value={selectedFarmFilter}
-                onChange={(e) => setSelectedFarmFilter(e.target.value)}
-                className="w-full h-10 rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
-              >
-                <option value="ALL">Todas as Fazendas ({farms.length})</option>
-                {farms.map((farm) => (
-                  <option key={farm.id} value={farm.id}>
-                    {farm.nome} {farm.filial ? `(Filial ${farm.filial})` : ""}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
+      {/* Barra de Busca e Filtros Padronizada */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-1">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Buscar por código, descrição, fazenda ou ID..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-9 h-9 text-xs bg-background border-border/80"
+          />
         </div>
 
-        <div className="text-xs text-muted-foreground shrink-0 self-end sm:self-center">
-          Total de {filteredFields.length} talhão(ões) listado(s)
+        <div className="flex items-center gap-2 flex-wrap">
+          {farms.length > 0 && (
+            <select
+              aria-label="Filtrar por Fazenda"
+              value={selectedFarmFilter}
+              onChange={(e) => setSelectedFarmFilter(e.target.value)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-xs text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
+            >
+              <option value="ALL">Todas as Fazendas ({farms.length})</option>
+              {farms.map((farm) => (
+                <option key={farm.id} value={farm.id}>
+                  {farm.nome} {farm.filial ? `(Filial ${farm.filial})` : ""}
+                </option>
+              ))}
+            </select>
+          )}
+
+          <div className="text-xs font-medium text-muted-foreground ml-1">
+            Total de {filteredFields.length} talhão(ões) listado(s)
+          </div>
         </div>
       </div>
 
-      {/* Tabela de Talhões */}
-      <Card className="border-border">
-        <CardHeader className="pb-3 border-b border-border/50">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base font-semibold">Registros de Talhões</CardTitle>
-              <CardDescription className="text-xs">
-                Listagem detalhada com ID do sistema, fazenda vinculada, código e descrição.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
+      {/* Tabela de Talhões Padronizada */}
+      <Card className="shadow-xs border-border/80 overflow-hidden">
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
-              <Loader2 className="size-5 animate-spin text-primary" />
-              <span className="text-sm">Carregando talhões...</span>
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Loader2 className="size-8 animate-spin text-primary mb-2" />
+              <p className="text-sm font-medium text-muted-foreground">Carregando talhões...</p>
             </div>
           ) : filteredFields.length === 0 ? (
-            <div className="py-16 text-center text-sm text-muted-foreground space-y-2">
-              <Grid3x3 className="size-10 mx-auto text-muted-foreground/40 mb-2" />
-              <p className="font-medium text-foreground">Nenhum talhão encontrado</p>
-              <p className="text-xs text-muted-foreground">
+            <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+              <div className="size-12 rounded-full bg-muted/60 flex items-center justify-center mb-3">
+                <Grid3x3 className="size-6 text-muted-foreground/60" />
+              </div>
+              <h3 className="text-base font-semibold text-foreground">Nenhum talhão encontrado</h3>
+              <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-4">
                 {searchTerm || selectedFarmFilter !== "ALL"
-                  ? "Tente ajustar os filtros ou termos de busca."
+                  ? "Nenhum resultado corresponde aos filtros aplicados. Tente ajustar os termos."
                   : farms.length === 0
                   ? "Cadastre uma fazenda primeiro para poder registrar seus talhões."
-                  : "Clique em 'Novo Talhão' para cadastrar o primeiro lote agrícola."}
+                  : "Nenhum talhão agrícola cadastrado. Cadastre o primeiro talhão para a unidade."}
               </p>
+              {farms.length === 0 ? (
+                <Button asChild size="sm" className="gap-1.5 text-xs font-semibold cursor-pointer">
+                  <Link to="/fazendas">Cadastrar Fazenda</Link>
+                </Button>
+              ) : (
+                <Button size="sm" onClick={handleOpenCreate} className="gap-1.5 text-xs font-semibold cursor-pointer">
+                  <Plus className="size-3.5" />
+                  Cadastrar Primeiro Talhão
+                </Button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-muted/40 border-b border-border/60 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider select-none">
                   <tr>
                     <th className="px-6 py-3.5">ID (Sistema)</th>
                     <th className="px-6 py-3.5">Fazenda Vinculada</th>

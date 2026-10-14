@@ -147,54 +147,71 @@ export function PlanListView() {
 
   return (
     <div className="space-y-4 w-full">
-      {/* Topo do Módulo conforme especificação da tela */}
-      <div className="rounded-xl border border-border bg-card p-4 shadow-sm space-y-3">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="grid size-10 place-items-center rounded-xl bg-primary/10 text-primary shrink-0">
-              <CalendarDays className="size-5" />
-            </div>
-            <div>
-              <h2 className="text-base font-bold text-foreground sm:text-lg">
-                Planejamento de Plantio
-              </h2>
-              <p className="text-xs text-muted-foreground">
-                Gerencie o calendário de culturas, plantios, colheitas e disponibilidade dos pivôs
-              </p>
-            </div>
+      {/* Barra Superior Padronizada */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="grid size-9 place-items-center rounded-xl bg-primary/10 border border-primary/20 text-primary shadow-xs">
+            <CalendarDays className="size-4" />
           </div>
-
-          <div className="flex items-center gap-2">
-            <Button size="sm" onClick={handleOpenCreate} className="h-8 gap-1.5 text-xs font-semibold">
-              <Plus className="size-3.5" />
-              Novo Planejamento
-            </Button>
-            <Button variant="outline" size="sm" onClick={loadPlans} disabled={loading} className="h-8 gap-1.5 text-xs">
-              <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
-            </Button>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-base font-bold text-foreground sm:text-lg">
+                Planos de Cultivo
+              </h2>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground border border-border/40">
+                {totalCount}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Acompanhamento de plantios, safras e ciclos operacionais
+            </p>
           </div>
         </div>
 
-        {/* Linha de Busca e Filtros */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-2 pt-1">
-          {/* Busca textual */}
-          <div className="relative md:col-span-1">
-            <Search className="absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
-            <Input
-              type="text"
-              placeholder="Pesquisar..."
-              value={search}
-              onChange={(e) => {
-                setSearch(e.target.value);
-                setPage(1);
-              }}
-              className="h-8 pl-8 text-xs"
-            />
-          </div>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadPlans}
+            disabled={loading}
+            className="h-9 gap-1.5 text-xs font-medium cursor-pointer shadow-xs"
+            title="Atualizar lista de planos"
+          >
+            <RefreshCw className={`size-3.5 ${loading ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">Atualizar</span>
+          </Button>
 
+          <Button
+            size="sm"
+            onClick={handleOpenCreate}
+            className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+          >
+            <Plus className="size-4" />
+            Novo Planejamento
+          </Button>
+        </div>
+      </div>
+
+      {/* Linha de Busca e Filtros Padronizada */}
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between pt-1">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="text"
+            placeholder="Pesquisar por cultura, pivô ou fazenda..."
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            className="pl-9 h-9 text-xs bg-background border-border/80"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap">
           {/* Filtro Safra */}
           <select
-            className="h-8 rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="h-9 rounded-md border border-input bg-background px-3 text-xs text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
             value={safraFilter}
             onChange={(e) => {
               setSafraFilter(e.target.value);
@@ -211,7 +228,7 @@ export function PlanListView() {
 
           {/* Filtro Fazenda */}
           <select
-            className="h-8 rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="h-9 rounded-md border border-input bg-background px-3 text-xs text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
             value={fazendaFilter}
             onChange={(e) => {
               setFazendaFilter(e.target.value);
@@ -229,7 +246,7 @@ export function PlanListView() {
 
           {/* Filtro Pivô / Talhão */}
           <select
-            className="h-8 rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="h-9 rounded-md border border-input bg-background px-3 text-xs text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
             value={pivoFilter}
             onChange={(e) => {
               setPivoFilter(e.target.value);
@@ -246,7 +263,7 @@ export function PlanListView() {
 
           {/* Filtro Cultura */}
           <select
-            className="h-8 rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="h-9 rounded-md border border-input bg-background px-3 text-xs text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
             value={culturaFilter}
             onChange={(e) => {
               setCulturaFilter(e.target.value);
@@ -263,7 +280,7 @@ export function PlanListView() {
 
           {/* Filtro Situação */}
           <select
-            className="h-8 rounded-md border border-input bg-background px-2.5 text-xs text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+            className="h-9 rounded-md border border-input bg-background px-3 text-xs text-foreground shadow-xs focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring cursor-pointer"
             value={statusFilter}
             onChange={(e) => {
               setStatusFilter(e.target.value);
@@ -280,20 +297,27 @@ export function PlanListView() {
         </div>
       </div>
 
-      {/* Tabela de 10 colunas estritas conforme especificação */}
-      <div className="rounded-xl border border-border bg-card shadow-sm overflow-hidden">
+      {/* Tabela de 10 colunas estritas */}
+      <div className="rounded-xl border border-border/80 bg-card shadow-xs overflow-hidden">
         {loading ? (
           <div className="py-20 text-center text-xs text-muted-foreground flex flex-col items-center gap-2">
-            <RefreshCw className="size-5 animate-spin text-primary" />
+            <RefreshCw className="size-6 animate-spin text-primary" />
             <span>Carregando planejamento de plantio...</span>
           </div>
         ) : plans.length === 0 ? (
-          <div className="py-20 text-center text-xs text-muted-foreground space-y-2">
-            <p className="font-semibold text-foreground text-sm">Nenhum planejamento encontrado com os filtros atuais.</p>
-            <p>Clique no botão abaixo para registrar o plantio de uma safra.</p>
-            <Button size="sm" onClick={handleOpenCreate} className="gap-1.5 text-xs font-semibold mt-2">
+          <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+            <div className="size-12 rounded-full bg-muted/60 flex items-center justify-center mb-3">
+              <CalendarDays className="size-6 text-muted-foreground/60" />
+            </div>
+            <h3 className="text-base font-semibold text-foreground">Nenhum planejamento encontrado</h3>
+            <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-4">
+              {search || safraFilter || fazendaFilter || statusFilter
+                ? "Nenhum resultado corresponde aos filtros aplicados. Tente ajustar os termos."
+                : "Nenhum plano de cultivo registrado no sistema. Cadastre o primeiro planejamento de plantio."}
+            </p>
+            <Button size="sm" onClick={handleOpenCreate} className="gap-1.5 text-xs font-semibold cursor-pointer">
               <Plus className="size-3.5" />
-              Novo Planejamento
+              Cadastrar Primeiro Planejamento
             </Button>
           </div>
         ) : (

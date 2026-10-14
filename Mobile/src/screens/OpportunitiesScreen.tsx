@@ -121,25 +121,14 @@ export function OpportunitiesScreen({ onOpenSync, userRole = "OPERADOR" }: Oppor
 
   return (
     <View style={styles.container}>
-      {/* Header com sincronização */}
+      {/* Header limpo (sem botão sincronizar no topo) */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>Janelas Agrícolas</Text>
+          <Text style={styles.headerTitle}>Janelas de Oportunidade</Text>
           <Text style={styles.headerSubtitle}>
-            {lastSyncTime ? `Última sincronização: ${lastSyncTime}` : "Modo offline ativo"}
+            Recomendações agronômicas, tarifas noturnas e plantio
           </Text>
         </View>
-        <TouchableOpacity
-          style={[styles.syncButton, syncing && styles.syncButtonDisabled]}
-          onPress={handleSyncNow}
-          disabled={syncing}
-        >
-          {syncing ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <Text style={styles.syncButtonText}>↻ Sincronizar</Text>
-          )}
-        </TouchableOpacity>
       </View>
 
       {/* Resumo de Indicadores */}

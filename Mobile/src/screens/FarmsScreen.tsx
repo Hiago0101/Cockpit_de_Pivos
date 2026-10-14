@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  RefreshControl,
+  useWindowDimensions,
 } from "react-native";
 import {
   Building2,
@@ -22,6 +24,7 @@ import {
   Check,
   AlertCircle,
   X,
+  ChevronRight,
 } from "lucide-react-native";
 import { mobileApi } from "../services/api";
 import { MobileFarm, MobileField } from "../types";
@@ -31,8 +34,12 @@ interface FarmsScreenProps {
 }
 
 export function FarmsScreen({ onNavigateToFields }: FarmsScreenProps) {
+  const { width: screenWidth } = useWindowDimensions();
+  const isDesktop = screenWidth >= 768;
+
   const [farms, setFarms] = useState<MobileFarm[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -52,7 +59,6 @@ export function FarmsScreen({ onNavigateToFields }: FarmsScreenProps) {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const loadFarms = async () => {
-    setIsLoading(true);
     try {
       const data = await mobileApi.getFarms();
       setFarms(data);
@@ -60,12 +66,18 @@ export function FarmsScreen({ onNavigateToFields }: FarmsScreenProps) {
       Alert.alert("Erro", err?.message || "Não foi possível carregar as fazendas.");
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
     loadFarms();
   }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadFarms();
+  };
 
   const handleOpenCreate = () => {
     setEditingFarm(null);
@@ -196,7 +208,7 @@ export function FarmsScreen({ onNavigateToFields }: FarmsScreenProps) {
 
   const handleCopyId = (id: string) => {
     setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2500);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const filteredFarms = farms.filter((f) => {
@@ -210,148 +222,198 @@ export function FarmsScreen({ onNavigateToFields }: FarmsScreenProps) {
 
   return (
     <View style={styles.container}>
-      {/* Header da Tela */}
+      {/* 1. Header Padronizado */}
       <View style={styles.screenHeader}>
-        <View style={styles.screenHeaderTitleGroup}>
-          <View style={styles.iconBadge}>
-            <Building2 size={20} color="#10b981" />
+        <View style={styles.screenTitleRow}>
+          <View style={styles.screenTitleGroup}>
+            <View style={styles.screenIconBox}>
+              <Building2 size={20} color="#10b981" />
+            </View>
+            <View>
+              <Text style={styles.screenTitle}>Gestão de Fazendas</Text>
+              <Text style={styles.screenSubtitle}>
+                {farms.length} unidade(s) agrícola(s) cadastrada(s)
+              </Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.screenTitle}>Cadastro de Fazendas</Text>
-            <Text style={styles.screenSubtitle}>Unidades agrícolas e filiais</Text>
-          </View>
-        </View>
 
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={loadFarms}
-            disabled={isLoading}
-            activeOpacity={0.7}
-          >
-            <RefreshCw size={16} color="#64748b" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={handleOpenCreate}
-            activeOpacity={0.8}
-          >
-            <Plus size={16} color="#ffffff" />
-            <Text style={styles.createButtonText}>Nova</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Barra de Busca e Filtros */}
-      <View style={styles.searchBarContainer}>
-        <View style={styles.searchBox}>
-          <Search size={18} color="#94a3b8" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar por nome, filial ou ID..."
-            placeholderTextColor="#94a3b8"
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-            autoCapitalize="none"
-          />
-          {searchTerm.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchTerm("")}>
-              <X size={16} color="#94a3b8" />
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.refreshButton}
+              onPress={handleRefresh}
+              disabled={isLoading}
+              activeOpacity={0.7}
+            >
+              <RefreshCw size={16} color="#64748b" />
             </TouchableOpacity>
-          )}
+
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={handleOpenCreate}
+              activeOpacity={0.8}
+            >
+              <Plus size={16} color="#ffffff" />
+              <Text style={styles.createButtonText}>Nova</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        <Text style={styles.counterText}>
-          {filteredFarms.length} fazenda(s) encontrada(s)
-        </Text>
+
+        {/* 2. Barra de Busca Padronizada */}
+        <View style={styles.searchBarContainer}>
+          <View style={styles.searchBox}>
+            <Search size={18} color="#94a3b8" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Buscar por nome, filial ou ID PIMS..."
+              placeholderTextColor="#94a3b8"
+              value={searchTerm}
+              onChangeText={setSearchTerm}
+              autoCapitalize="none"
+            />
+            {searchTerm.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchTerm("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <X size={16} color="#94a3b8" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
       </View>
 
-      {/* Lista de Fazendas */}
+      {/* 3. Lista e Cards Padronizados */}
       {isLoading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#10b981" />
+          <ActivityIndicator size="large" color="#1b7d52" />
           <Text style={styles.loadingText}>Carregando fazendas...</Text>
         </View>
       ) : (
         <FlatList
           data={filteredFarms}
           keyExtractor={(item, index) => String(item?.id || index)}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, isDesktop && styles.listContentDesktop]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={["#10b981"]}
+            />
+          }
           renderItem={({ item }) => {
             const filialDisplay = item.filial || item.codigo || "—";
             return (
-              <View style={styles.farmCard}>
-                {/* Linha Superior: Nome e Filial */}
+              <View style={[styles.recordCard, isDesktop && styles.recordCardDesktop]}>
+                {/* Linha Superior: Ícone + Título + Ações */}
                 <View style={styles.cardHeaderRow}>
-                  <View style={styles.farmNameGroup}>
-                    <Text style={styles.farmName} numberOfLines={1}>
-                      {item.nome}
-                    </Text>
-                    {item.id_pims && (
-                      <View style={styles.pimsBadge}>
-                        <Text style={styles.pimsBadgeText}>PIMS: {item.id_pims}</Text>
-                      </View>
-                    )}
+                  <View style={styles.cardTitleGroup}>
+                    <View style={styles.cardIconBox}>
+                      <Building2 size={18} color="#10b981" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.cardTitle} numberOfLines={1}>
+                        {item.nome}
+                      </Text>
+                      <Text style={styles.cardSubtitle}>
+                        Filial {filialDisplay}
+                      </Text>
+                    </View>
                   </View>
-                  <View style={styles.filialBadge}>
-                    <Text style={styles.filialBadgeText}>Filial: {filialDisplay}</Text>
+
+                  <View style={styles.cardActionButtons}>
+                    <TouchableOpacity
+                      style={styles.actionBtn}
+                      onPress={() => handleOpenEdit(item)}
+                      activeOpacity={0.7}
+                    >
+                      <Edit2 size={15} color="#0f766e" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.actionBtnDelete}
+                      onPress={() => handleOpenDelete(item)}
+                      activeOpacity={0.7}
+                    >
+                      <Trash2 size={15} color="#dc2626" />
+                    </TouchableOpacity>
                   </View>
                 </View>
 
-                {/* Linha do ID com Cópia */}
-                <View style={styles.idRow}>
-                  <Text style={styles.idLabel}>ID:</Text>
-                  <Text style={styles.idValue} numberOfLines={1}>
-                    {item.id}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.copyButton}
-                    onPress={() => handleCopyId(item.id)}
-                    activeOpacity={0.7}
-                  >
-                    {copiedId === item.id ? (
-                      <Check size={14} color="#10b981" />
-                    ) : (
-                      <Copy size={14} color="#64748b" />
-                    )}
-                    <Text style={styles.copyButtonText}>
-                      {copiedId === item.id ? "Copiado!" : "Copiar"}
+                {/* Grade de Métricas Padronizada (3 colunas) */}
+                <View style={styles.metricsGrid}>
+                  <View style={styles.metricCol}>
+                    <Text style={styles.metricLabel}>FILIAL</Text>
+                    <Text style={styles.metricValue}>{filialDisplay}</Text>
+                  </View>
+                  <View style={styles.metricCol}>
+                    <Text style={styles.metricLabel}>ID PIMS</Text>
+                    <Text style={styles.metricValue} numberOfLines={1}>
+                      {item.id_pims || "—"}
                     </Text>
-                  </TouchableOpacity>
+                  </View>
+                  <View style={styles.metricCol}>
+                    <Text style={styles.metricLabel}>STATUS</Text>
+                    <View style={styles.statusPill}>
+                      <Text style={styles.statusPillText}>Ativa</Text>
+                    </View>
+                  </View>
                 </View>
 
-                {/* Linha de Ações: Editar e Excluir */}
-                <View style={styles.cardActionsRow}>
-                  <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={() => handleOpenEdit(item)}
-                    activeOpacity={0.7}
-                  >
-                    <Edit2 size={14} color="#0f766e" />
-                    <Text style={styles.editButtonText}>Editar</Text>
-                  </TouchableOpacity>
+                {/* Rodapé: ID do Sistema + Atalho para Talhões */}
+                <View style={styles.cardFooter}>
+                  <View style={styles.idGroup}>
+                    <Text style={styles.idLabel}>ID:</Text>
+                    <Text style={styles.idValue} numberOfLines={1}>
+                      {item.id.slice(0, 10)}...
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.copyBtn}
+                      onPress={() => handleCopyId(item.id)}
+                      activeOpacity={0.7}
+                    >
+                      {copiedId === item.id ? (
+                        <Check size={12} color="#10b981" />
+                      ) : (
+                        <Copy size={12} color="#64748b" />
+                      )}
+                      <Text style={styles.copyBtnText}>
+                        {copiedId === item.id ? "Copiado!" : "Copiar"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => handleOpenDelete(item)}
-                    activeOpacity={0.7}
-                  >
-                    <Trash2 size={14} color="#dc2626" />
-                    <Text style={styles.deleteButtonText}>Excluir</Text>
-                  </TouchableOpacity>
+                  {onNavigateToFields && (
+                    <TouchableOpacity
+                      style={styles.linkTalhoes}
+                      onPress={() => onNavigateToFields(item.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.linkTalhoesText}>Ver Talhões</Text>
+                      <ChevronRight size={14} color="#1b7d52" />
+                    </TouchableOpacity>
+                  )}
                 </View>
               </View>
             );
           }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Building2 size={42} color="#cbd5e1" />
+              <View style={styles.emptyIconBox}>
+                <Building2 size={36} color="#94a3b8" />
+              </View>
               <Text style={styles.emptyTitle}>Nenhuma fazenda encontrada</Text>
               <Text style={styles.emptySubtitle}>
-                {searchTerm
-                  ? "Tente refinar sua busca por filial ou nome."
-                  : "Toque em '+ Nova' para cadastrar a primeira fazenda."}
+                {searchTerm.length > 0
+                  ? "Tente refinar sua busca por nome ou filial."
+                  : "Toque em '+ Nova' para cadastrar a primeira unidade agrícola."}
               </Text>
+              {searchTerm.length === 0 && (
+                <TouchableOpacity
+                  style={styles.emptyCreateButton}
+                  onPress={handleOpenCreate}
+                  activeOpacity={0.8}
+                >
+                  <Plus size={16} color="#ffffff" />
+                  <Text style={styles.emptyCreateButtonText}>Cadastrar Primeira Fazenda</Text>
+                </TouchableOpacity>
+              )}
             </View>
           }
         />
@@ -365,12 +427,17 @@ export function FarmsScreen({ onNavigateToFields }: FarmsScreenProps) {
         onRequestClose={() => setIsModalOpen(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDesktop && styles.modalCardDesktop]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingFarm ? "Editar Fazenda" : "Nova Fazenda"}
-              </Text>
-              <TouchableOpacity onPress={() => setIsModalOpen(false)}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <View style={styles.modalHeaderIcon}>
+                  <Building2 size={18} color="#10b981" />
+                </View>
+                <Text style={styles.modalTitle}>
+                  {editingFarm ? "Editar Fazenda" : "Nova Fazenda"}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsModalOpen(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <X size={20} color="#64748b" />
               </TouchableOpacity>
             </View>
@@ -388,7 +455,7 @@ export function FarmsScreen({ onNavigateToFields }: FarmsScreenProps) {
                 <Text style={styles.inputLabel}>Nome da Fazenda *</Text>
                 <TextInput
                   style={[styles.input, styles.inputUppercase]}
-                  placeholder="Ex: FAZENDA FARROUPILHA I"
+                  placeholder="Ex: FAZENDA SANTA MARIA"
                   placeholderTextColor="#94a3b8"
                   value={formNome}
                   onChangeText={(text) => setFormNome(text.toUpperCase())}
@@ -399,7 +466,7 @@ export function FarmsScreen({ onNavigateToFields }: FarmsScreenProps) {
 
               {/* Campo Filial */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Filial *</Text>
+                <Text style={styles.inputLabel}>Filial (6 dígitos numéricos) *</Text>
                 <TextInput
                   style={styles.input}
                   placeholder="000001"
@@ -449,7 +516,7 @@ export function FarmsScreen({ onNavigateToFields }: FarmsScreenProps) {
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
                   <Text style={styles.modalSubmitButtonText}>
-                    {editingFarm ? "Salvar" : "Cadastrar"}
+                    {editingFarm ? "Salvar Alterações" : "Cadastrar Fazenda"}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -466,7 +533,7 @@ export function FarmsScreen({ onNavigateToFields }: FarmsScreenProps) {
         onRequestClose={() => setFarmToDelete(null)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.deleteModalCard}>
+          <View style={[styles.deleteModalCard, isDesktop && styles.modalCardDesktop]}>
             <View style={styles.deleteModalHeader}>
               <View style={styles.deleteIconBadge}>
                 <Trash2 size={24} color="#dc2626" />
@@ -476,7 +543,7 @@ export function FarmsScreen({ onNavigateToFields }: FarmsScreenProps) {
 
             <Text style={styles.deleteModalMessage}>
               Tem certeza que deseja excluir a fazenda{" "}
-              <Text style={{ fontWeight: "700" }}>"{farmToDelete?.nome}"</Text>{" "}
+              <Text style={{ fontWeight: "700", color: "#0f172a" }}>"{farmToDelete?.nome}"</Text>{" "}
               (Filial: {farmToDelete?.filial || farmToDelete?.codigo})?
             </Text>
 
@@ -515,18 +582,16 @@ export function FarmsScreen({ onNavigateToFields }: FarmsScreenProps) {
 
               <TouchableOpacity
                 style={[
-                  styles.confirmDeleteButton,
-                  (linkedFields.length > 0 || isCheckingDelete) && styles.disabledDeleteButton,
+                  styles.deleteModalConfirmButton,
+                  linkedFields.length > 0 && styles.disabledButton,
                 ]}
                 onPress={handleConfirmDelete}
-                disabled={isDeleting || isCheckingDelete || linkedFields.length > 0}
+                disabled={isDeleting || linkedFields.length > 0}
               >
                 {isDeleting ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.confirmDeleteButtonText}>
-                    {linkedFields.length > 0 ? "Bloqueado" : "Sim, Excluir"}
-                  </Text>
+                  <Text style={styles.deleteModalConfirmText}>Confirmar Exclusão</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -543,36 +608,44 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
   },
   screenHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
   },
-  screenHeaderTitleGroup: {
+  screenTitleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
   },
-  iconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: "rgba(16, 185, 129, 0.12)",
-    justifyContent: "center",
+  screenTitleGroup: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 12,
+  },
+  screenIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    alignItems: "center",
+    justifyContent: "center",
   },
   screenTitle: {
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 18,
+    fontWeight: "800",
     color: "#0f172a",
+    letterSpacing: -0.3,
   },
   screenSubtitle: {
     fontSize: 11,
     color: "#64748b",
+    marginTop: 2,
+    fontWeight: "500",
   },
   headerActions: {
     flexDirection: "row",
@@ -580,23 +653,28 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   refreshButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: "#f8fafc",
     borderWidth: 1,
     borderColor: "#e2e8f0",
-    justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
+    justifyContent: "center",
   },
   createButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    backgroundColor: "#10b981",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
+    gap: 6,
+    backgroundColor: "#1b7d52",
+    paddingHorizontal: 14,
+    height: 36,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   createButtonText: {
     color: "#ffffff",
@@ -605,20 +683,18 @@ const styles = StyleSheet.create({
   },
   searchBarContainer: {
     paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 8,
-    backgroundColor: "#ffffff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
+    paddingBottom: 12,
   },
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#f8fafc",
     borderRadius: 8,
     paddingHorizontal: 12,
     height: 40,
     gap: 8,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
   },
   searchInput: {
     flex: 1,
@@ -626,345 +702,446 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     paddingVertical: 0,
   },
-  counterText: {
-    fontSize: 11,
-    color: "#64748b",
-    marginTop: 6,
-  },
+
+  // Conteúdo da Lista e Cards
   listContent: {
     padding: 16,
     gap: 12,
+    paddingBottom: 32,
   },
-  farmCard: {
+  listContentDesktop: {
+    alignItems: "center",
+  },
+  recordCard: {
     backgroundColor: "#ffffff",
-    borderRadius: 10,
-    padding: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#e2e8f0",
+    padding: 14,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
     elevation: 1,
+  },
+  recordCardDesktop: {
+    maxWidth: 960,
+    width: "100%",
   },
   cardHeaderRow: {
     flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
-    alignItems: "flex-start",
-    marginBottom: 8,
+    marginBottom: 12,
   },
-  farmNameGroup: {
+  cardTitleGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     flex: 1,
-    marginRight: 8,
   },
-  farmName: {
+  cardIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cardTitle: {
     fontSize: 15,
     fontWeight: "700",
     color: "#0f172a",
   },
-  pimsBadge: {
-    backgroundColor: "#f1f5f9",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    alignSelf: "flex-start",
-    marginTop: 4,
-  },
-  pimsBadgeText: {
-    fontSize: 10,
-    color: "#475569",
-    fontWeight: "600",
-  },
-  filialBadge: {
-    backgroundColor: "rgba(16, 185, 129, 0.12)",
-    borderColor: "rgba(16, 185, 129, 0.25)",
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  filialBadgeText: {
-    color: "#059669",
+  cardSubtitle: {
     fontSize: 11,
-    fontWeight: "800",
-    fontFamily: "monospace",
+    color: "#64748b",
+    marginTop: 1,
+    fontWeight: "500",
   },
-  idRow: {
+  cardActionButtons: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 6,
-    marginBottom: 10,
     gap: 6,
   },
-  idLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#94a3b8",
-  },
-  idValue: {
-    flex: 1,
-    fontSize: 11,
-    color: "#64748b",
-    fontFamily: "monospace",
-  },
-  copyButton: {
-    flexDirection: "row",
+  actionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
     alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 6,
+    justifyContent: "center",
+  },
+  actionBtnDelete: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: "#fef2f2",
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Grade de Métricas (3 Colunas)
+  metricsGrid: {
+    flexDirection: "row",
+    backgroundColor: "#f8fafc",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#f1f5f9",
+    padding: 10,
+    marginBottom: 12,
+  },
+  metricCol: {
+    flex: 1,
+  },
+  metricLabel: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#64748b",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  metricValue: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+  statusPill: {
+    backgroundColor: "#ecfdf5",
+    paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
-    backgroundColor: "#ffffff",
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#bbf7d0",
+    alignSelf: "flex-start",
   },
-  copyButtonText: {
+  statusPillText: {
     fontSize: 10,
-    color: "#64748b",
-    fontWeight: "600",
+    fontWeight: "700",
+    color: "#047857",
   },
-  cardActionsRow: {
+
+  // Rodapé do Card
+  cardFooter: {
     flexDirection: "row",
-    justifyContent: "flex-end",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "space-between",
     borderTopWidth: 1,
     borderTopColor: "#f1f5f9",
     paddingTop: 10,
   },
-  editButton: {
+  idGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  idLabel: {
+    fontSize: 10,
+    color: "#94a3b8",
+    fontWeight: "600",
+  },
+  idValue: {
+    fontSize: 11,
+    fontFamily: "monospace",
+    color: "#64748b",
+  },
+  copyBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: "rgba(15, 118, 110, 0.08)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: "#f1f5f9",
   },
-  editButtonText: {
-    fontSize: 12,
+  copyBtnText: {
+    fontSize: 10,
     fontWeight: "600",
-    color: "#0f766e",
+    color: "#64748b",
   },
-  deleteButton: {
+  linkTalhoes: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: "rgba(220, 38, 38, 0.08)",
+    backgroundColor: "#ecfdf5",
   },
-  deleteButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#dc2626",
+  linkTalhoesText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#1b7d52",
   },
+
+  // Estados Centrais e Vazios
   centerContainer: {
     flex: 1,
-    justifyContent: "center",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "center",
+    padding: 32,
   },
   loadingText: {
+    marginTop: 12,
     fontSize: 13,
     color: "#64748b",
+    fontWeight: "500",
   },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 48,
-    gap: 8,
+    paddingHorizontal: 24,
+  },
+  emptyIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
   },
   emptyTitle: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#0f172a",
+    marginBottom: 4,
   },
   emptySubtitle: {
     fontSize: 12,
-    color: "#94a3b8",
+    color: "#64748b",
     textAlign: "center",
-    maxWidth: 240,
+    maxWidth: 280,
+    lineHeight: 18,
   },
+  emptyCreateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#1b7d52",
+    paddingHorizontal: 16,
+    height: 40,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  emptyCreateButtonText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  // Modais Padronizados
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
     justifyContent: "center",
     alignItems: "center",
     padding: 16,
   },
   modalCard: {
     backgroundColor: "#ffffff",
-    borderRadius: 14,
+    borderRadius: 16,
     width: "100%",
-    maxHeight: "85%",
+    maxWidth: 480,
+    maxHeight: "90%",
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalCardDesktop: {
+    maxWidth: 520,
   },
   modalHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 18,
-    paddingVertical: 14,
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
+    borderBottomColor: "#e2e8f0",
+  },
+  modalHeaderIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#ecfdf5",
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalTitle: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#0f172a",
+  },
+  modalBody: {
+    padding: 20,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#334155",
+    marginBottom: 6,
+  },
+  input: {
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#0f172a",
+  },
+  inputUppercase: {
+    textTransform: "uppercase",
+  },
+  inputHelp: {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 4,
   },
   errorBanner: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#fee2e2",
-    marginHorizontal: 18,
-    marginTop: 12,
+    backgroundColor: "#fef2f2",
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    marginHorizontal: 20,
+    marginTop: 14,
     padding: 10,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   errorBannerText: {
-    flex: 1,
-    fontSize: 11,
-    color: "#b91c1c",
-  },
-  modalBody: {
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-  inputGroup: {
-    marginBottom: 14,
-  },
-  inputLabel: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#334155",
-    marginBottom: 6,
-  },
-  input: {
-    height: 42,
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 14,
-    backgroundColor: "#ffffff",
-    color: "#0f172a",
-  },
-  inputUppercase: {
-    fontWeight: "600",
-  },
-  inputHelp: {
-    fontSize: 11,
-    color: "#94a3b8",
-    marginTop: 4,
+    color: "#b91c1c",
+    flex: 1,
+    fontWeight: "500",
   },
   modalFooter: {
     flexDirection: "row",
     justifyContent: "flex-end",
+    alignItems: "center",
     gap: 10,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
+    borderTopColor: "#e2e8f0",
+    backgroundColor: "#f8fafc",
   },
   modalCancelButton: {
     paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#cbd5e1",
+    backgroundColor: "#ffffff",
   },
   modalCancelButtonText: {
     fontSize: 13,
-    color: "#64748b",
     fontWeight: "600",
+    color: "#475569",
   },
   modalSubmitButton: {
-    backgroundColor: "#10b981",
     paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 6,
-    minWidth: 90,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#1b7d52",
+    minWidth: 120,
     alignItems: "center",
   },
   modalSubmitButtonText: {
     fontSize: 13,
-    color: "#ffffff",
     fontWeight: "700",
+    color: "#ffffff",
   },
+
+  // Modal de Exclusão
   deleteModalCard: {
     backgroundColor: "#ffffff",
-    borderRadius: 14,
-    padding: 20,
+    borderRadius: 16,
     width: "100%",
+    maxWidth: 440,
+    padding: 20,
   },
   deleteModalHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginBottom: 12,
+    gap: 12,
+    marginBottom: 14,
   },
   deleteIconBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: "#fee2e2",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
   },
   deleteModalTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#dc2626",
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0f172a",
   },
   deleteModalMessage: {
     fontSize: 13,
-    color: "#334155",
-    lineHeight: 18,
-    marginBottom: 10,
-  },
-  deleteModalWarning: {
-    fontSize: 11,
-    color: "#94a3b8",
-    marginBottom: 16,
+    color: "#475569",
+    lineHeight: 20,
+    marginBottom: 12,
   },
   checkingContainer: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    marginVertical: 12,
+    padding: 10,
+    backgroundColor: "#f1f5f9",
+    borderRadius: 8,
+    marginBottom: 14,
   },
   checkingText: {
     fontSize: 12,
-    color: "#64748b",
+    color: "#475569",
   },
   blockedAlert: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
+    gap: 10,
+    padding: 12,
     backgroundColor: "#fef2f2",
-    borderColor: "#fecaca",
-    borderWidth: 1,
     borderRadius: 8,
-    padding: 10,
-    marginVertical: 10,
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    marginBottom: 14,
   },
   blockedAlertTitle: {
     fontSize: 12,
     fontWeight: "700",
     color: "#991b1b",
+    marginBottom: 2,
   },
   blockedAlertText: {
     fontSize: 11,
     color: "#b91c1c",
-    marginTop: 2,
-    lineHeight: 15,
+    lineHeight: 16,
+  },
+  deleteModalWarning: {
+    fontSize: 11,
+    color: "#dc2626",
+    marginBottom: 14,
+    fontWeight: "500",
   },
   deleteModalFooter: {
     flexDirection: "row",
@@ -972,20 +1149,19 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 8,
   },
-  confirmDeleteButton: {
-    backgroundColor: "#dc2626",
+  deleteModalConfirmButton: {
     paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 6,
-    minWidth: 100,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#dc2626",
     alignItems: "center",
   },
-  confirmDeleteButtonText: {
-    color: "#ffffff",
+  deleteModalConfirmText: {
     fontSize: 13,
     fontWeight: "700",
+    color: "#ffffff",
   },
-  disabledDeleteButton: {
-    backgroundColor: "#94a3b8",
+  disabledButton: {
+    opacity: 0.5,
   },
 });

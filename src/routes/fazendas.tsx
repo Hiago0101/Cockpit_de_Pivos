@@ -239,39 +239,45 @@ function FazendasPage() {
   });
 
   return (
-    <div className="flex-1 space-y-6 p-6 sm:p-8">
-      {/* Cabeçalho */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="grid size-9 place-items-center rounded-lg bg-primary/10 text-primary">
-              <Building2 className="size-5" />
-            </div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
-              Cadastro de Fazendas
-            </h1>
+    <div className="flex-1 space-y-6 p-4 sm:p-6 lg:p-8 w-full max-w-[1600px] mx-auto">
+      {/* Cabeçalho Padronizado */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-center gap-3">
+          <div className="grid size-11 place-items-center rounded-xl bg-primary/10 border border-primary/20 text-primary shadow-xs">
+            <Building2 className="size-5" />
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Gerencie as unidades agrícolas, filiais operacionais e identificadores integrados ao sistema.
-          </p>
+          <div>
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-bold tracking-tight text-foreground sm:text-3xl">
+                Cadastro de Fazendas
+              </h1>
+              <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-semibold text-muted-foreground border border-border/40">
+                {farms.length}
+              </span>
+            </div>
+            <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+              Gerencie as unidades agrícolas, filiais operacionais e identificadores integrados ao sistema.
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
             onClick={loadFarms}
             disabled={isLoading}
-            className="cursor-pointer gap-1.5"
+            className="h-9 gap-1.5 text-xs font-medium cursor-pointer shadow-xs"
+            title="Atualizar lista de fazendas"
           >
             <RefreshCw className={`size-3.5 ${isLoading ? "animate-spin" : ""}`} />
-            Atualizar
+            <span className="hidden sm:inline">Atualizar</span>
           </Button>
 
           <Button
             size="sm"
             onClick={handleOpenCreate}
-            className="cursor-pointer gap-1.5 font-semibold shadow-sm"
+            className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
           >
             <Plus className="size-4" />
             Nova Fazenda
@@ -279,53 +285,51 @@ function FazendasPage() {
         </div>
       </div>
 
-      {/* Barra de Busca e Filtros */}
-      <div className="flex items-center justify-between gap-4">
+      {/* Barra de Busca e Filtros Padronizada */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between pt-1">
         <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
             type="text"
-            placeholder="Buscar por Nome da Fazenda, Filial ou ID..."
+            placeholder="Buscar por nome da fazenda, filial ou ID..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9 h-10 text-sm bg-background"
+            className="pl-9 h-9 text-xs bg-background border-border/80"
           />
         </div>
-        <div className="text-xs text-muted-foreground">
+        <div className="text-xs font-medium text-muted-foreground">
           Total de {filteredFarms.length} fazenda(s) listada(s)
         </div>
       </div>
 
-      {/* Tabela de Fazendas */}
-      <Card className="border-border">
-        <CardHeader className="pb-3 border-b border-border/50">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base font-semibold">Registros de Fazendas</CardTitle>
-              <CardDescription className="text-xs">
-                Listagem detalhada de ID, Filial e Nome da Fazenda.
-              </CardDescription>
-            </div>
-          </div>
-        </CardHeader>
+      {/* Tabela de Fazendas Padronizada */}
+      <Card className="shadow-xs border-border/80 overflow-hidden">
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="flex items-center justify-center py-16 text-muted-foreground gap-2">
-              <Loader2 className="size-5 animate-spin text-primary" />
-              <span className="text-sm">Carregando fazendas...</span>
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <Loader2 className="size-8 animate-spin text-primary mb-2" />
+              <p className="text-sm font-medium text-muted-foreground">Carregando fazendas...</p>
             </div>
           ) : filteredFarms.length === 0 ? (
-            <div className="py-16 text-center text-sm text-muted-foreground space-y-2">
-              <Building2 className="size-10 mx-auto text-muted-foreground/40 mb-2" />
-              <p className="font-medium text-foreground">Nenhuma fazenda encontrada</p>
-              <p className="text-xs text-muted-foreground">
-                {searchTerm ? "Tente ajustar os termos de busca." : "Clique em 'Nova Fazenda' para cadastrar a primeira unidade."}
+            <div className="flex flex-col items-center justify-center py-16 text-center px-4">
+              <div className="size-12 rounded-full bg-muted/60 flex items-center justify-center mb-3">
+                <Building2 className="size-6 text-muted-foreground/60" />
+              </div>
+              <h3 className="text-base font-semibold text-foreground">Nenhuma fazenda encontrada</h3>
+              <p className="text-xs text-muted-foreground max-w-sm mt-1 mb-4">
+                {searchTerm
+                  ? "Nenhum resultado corresponde aos termos de busca aplicados."
+                  : "Nenhuma fazenda cadastrada no sistema. Cadastre a primeira unidade agrícola."}
               </p>
+              <Button size="sm" onClick={handleOpenCreate} className="gap-1.5 text-xs font-semibold cursor-pointer">
+                <Plus className="size-3.5" />
+                Cadastrar Primeira Fazenda
+              </Button>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="bg-muted/40 text-xs font-semibold uppercase tracking-wider text-muted-foreground border-b border-border">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-muted/40 border-b border-border/60 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider select-none">
                   <tr>
                     <th className="px-6 py-3.5">ID (Sistema)</th>
                     <th className="px-6 py-3.5">Filial</th>

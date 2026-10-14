@@ -10,6 +10,8 @@ import {
   ActivityIndicator,
   Alert,
   ScrollView,
+  RefreshControl,
+  useWindowDimensions,
 } from "react-native";
 import {
   Grid3x3,
@@ -21,25 +23,31 @@ import {
   Copy,
   Check,
   AlertCircle,
-  Building2,
   X,
-  Filter,
+  Building2,
   ChevronDown,
 } from "lucide-react-native";
 import { mobileApi } from "../services/api";
 import { MobileFarm, MobileField } from "../types";
 
 interface FieldsScreenProps {
-  onNavigateToFarms?: () => void;
+  initialFarmFilter?: string;
   initialFarmId?: string;
+  onNavigateToFarms?: () => void;
 }
 
-export function FieldsScreen({ onNavigateToFarms, initialFarmId }: FieldsScreenProps) {
-  const [fields, setFields] = useState<MobileField[]>([]);
+export function FieldsScreen({ initialFarmFilter = "ALL", initialFarmId, onNavigateToFarms }: FieldsScreenProps) {
+  const { width: screenWidth } = useWindowDimensions();
+  const isDesktop = screenWidth >= 768;
+
+  const defaultFilter = initialFarmId || initialFarmFilter || "ALL";
+
   const [farms, setFarms] = useState<MobileFarm[]>([]);
+  const [fields, setFields] = useState<MobileField[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedFarmFilter, setSelectedFarmFilter] = useState<string>(initialFarmId || "ALL");
+  const [selectedFarmFilter, setSelectedFarmFilter] = useState<string>(defaultFilter);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Modal de Criação / Edição
@@ -60,7 +68,6 @@ export function FieldsScreen({ onNavigateToFarms, initialFarmId }: FieldsScreenP
   const [showFarmPicker, setShowFarmPicker] = useState(false);
 
   const loadData = async () => {
-    setIsLoading(true);
     try {
       const [farmsData, fieldsData] = await Promise.all([
         mobileApi.getFarms(),
@@ -72,12 +79,18 @@ export function FieldsScreen({ onNavigateToFarms, initialFarmId }: FieldsScreenP
       Alert.alert("Erro", err?.message || "Não foi possível carregar os dados de talhões.");
     } finally {
       setIsLoading(false);
+      setRefreshing(false);
     }
   };
 
   useEffect(() => {
     loadData();
   }, []);
+
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadData();
+  };
 
   const handleOpenCreate = () => {
     setEditingField(null);
@@ -187,7 +200,7 @@ export function FieldsScreen({ onNavigateToFarms, initialFarmId }: FieldsScreenP
 
   const handleCopyId = (id: string) => {
     setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2500);
+    setTimeout(() => setCopiedId(null), 2000);
   };
 
   const filteredFields = fields.filter((f) => {
@@ -207,231 +220,251 @@ export function FieldsScreen({ onNavigateToFarms, initialFarmId }: FieldsScreenP
 
   return (
     <View style={styles.container}>
-      {/* Header da Tela */}
+      {/* 1. Header Padronizado */}
       <View style={styles.screenHeader}>
-        <View style={styles.screenHeaderTitleGroup}>
-          <View style={styles.iconBadge}>
-            <Grid3x3 size={20} color="#10b981" />
+        <View style={styles.screenTitleRow}>
+          <View style={styles.screenTitleGroup}>
+            <View style={styles.screenIconBox}>
+              <Grid3x3 size={20} color="#10b981" />
+            </View>
+            <View>
+              <Text style={styles.screenTitle}>Gestão de Talhões</Text>
+              <Text style={styles.screenSubtitle}>
+                {fields.length} talhão(ões) cadastrado(s)
+              </Text>
+            </View>
           </View>
-          <View>
-            <Text style={styles.screenTitle}>Cadastro de Talhões</Text>
-            <Text style={styles.screenSubtitle}>Lotes agrícolas e identificadores</Text>
-          </View>
-        </View>
 
-        <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.refreshButton}
-            onPress={loadData}
-            disabled={isLoading}
-            activeOpacity={0.7}
-          >
-            <RefreshCw size={16} color="#64748b" />
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.createButton}
-            onPress={handleOpenCreate}
-            activeOpacity={0.8}
-          >
-            <Plus size={16} color="#ffffff" />
-            <Text style={styles.createButtonText}>Novo</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {/* Alerta se não houver fazendas cadastradas */}
-      {!isLoading && farms.length === 0 && (
-        <View style={styles.noFarmsBanner}>
-          <AlertCircle size={18} color="#b45309" />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.noFarmsBannerTitle}>Nenhuma fazenda cadastrada</Text>
-            <Text style={styles.noFarmsBannerText}>
-              Para cadastrar talhões, é necessário vincular a uma fazenda.
-            </Text>
-          </View>
-          {onNavigateToFarms && (
-            <TouchableOpacity style={styles.noFarmsBannerBtn} onPress={onNavigateToFarms}>
-              <Text style={styles.noFarmsBannerBtnText}>Criar Fazenda</Text>
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              style={styles.refreshButton}
+              onPress={handleRefresh}
+              disabled={isLoading}
+              activeOpacity={0.7}
+            >
+              <RefreshCw size={16} color="#64748b" />
             </TouchableOpacity>
-          )}
-        </View>
-      )}
 
-      {/* Barra de Filtros e Busca */}
-      <View style={styles.filterSection}>
-        {/* Filtro por Fazenda (Horizontal Pills) */}
+            <TouchableOpacity
+              style={styles.createButton}
+              onPress={handleOpenCreate}
+              activeOpacity={0.8}
+            >
+              <Plus size={16} color="#ffffff" />
+              <Text style={styles.createButtonText}>Novo</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 2. Barra de Busca Padronizada */}
+        <View style={styles.searchBarContainer}>
+          <View style={styles.searchBox}>
+            <Search size={18} color="#94a3b8" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Buscar por código, descrição ou fazenda..."
+              placeholderTextColor="#94a3b8"
+              value={searchTerm}
+              onChangeText={setSearchTerm}
+              autoCapitalize="none"
+            />
+            {searchTerm.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchTerm("")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+                <X size={16} color="#94a3b8" />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* 3. Filtros por Fazenda em Scroll Horizontal Padronizado */}
         {farms.length > 0 && (
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.farmPillsScroll}
+            style={styles.filterChipScroll}
+            contentContainerStyle={styles.filterChipContent}
           >
             <TouchableOpacity
-              style={[
-                styles.farmPill,
-                selectedFarmFilter === "ALL" && styles.farmPillActive,
-              ]}
+              style={[styles.filterChip, selectedFarmFilter === "ALL" && styles.filterChipActive]}
               onPress={() => setSelectedFarmFilter("ALL")}
+              activeOpacity={0.7}
             >
-              <Text
-                style={[
-                  styles.farmPillText,
-                  selectedFarmFilter === "ALL" && styles.farmPillTextActive,
-                ]}
-              >
-                Todas ({fields.length})
+              <Text style={[styles.filterChipText, selectedFarmFilter === "ALL" && styles.filterChipTextActive]}>
+                Todas as Fazendas ({fields.length})
               </Text>
             </TouchableOpacity>
 
-            {farms.map((farm) => {
-              const count = fields.filter((f) => f.fazenda === farm.id).length;
-              const isSelected = selectedFarmFilter === farm.id;
+            {farms.map((f) => {
+              const count = fields.filter((field) => field.fazenda === f.id).length;
+              const isSelected = selectedFarmFilter === f.id;
               return (
                 <TouchableOpacity
-                  key={farm.id}
-                  style={[styles.farmPill, isSelected && styles.farmPillActive]}
-                  onPress={() => setSelectedFarmFilter(farm.id)}
+                  key={f.id}
+                  style={[styles.filterChip, isSelected && styles.filterChipActive]}
+                  onPress={() => setSelectedFarmFilter(f.id)}
+                  activeOpacity={0.7}
                 >
-                  <Text
-                    style={[styles.farmPillText, isSelected && styles.farmPillTextActive]}
-                    numberOfLines={1}
-                  >
-                    {farm.nome} ({count})
+                  <Text style={[styles.filterChipText, isSelected && styles.filterChipTextActive]} numberOfLines={1}>
+                    {f.nome} ({count})
                   </Text>
                 </TouchableOpacity>
               );
             })}
           </ScrollView>
         )}
-
-        {/* Busca textual */}
-        <View style={styles.searchBox}>
-          <Search size={18} color="#94a3b8" />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Buscar por código, descrição ou ID..."
-            placeholderTextColor="#94a3b8"
-            value={searchTerm}
-            onChangeText={setSearchTerm}
-            autoCapitalize="none"
-          />
-          {searchTerm.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchTerm("")}>
-              <X size={16} color="#94a3b8" />
-            </TouchableOpacity>
-          )}
-        </View>
-
-        <Text style={styles.counterText}>
-          {filteredFields.length} talhão(ões) listado(s)
-        </Text>
       </View>
 
-      {/* Lista de Talhões */}
+      {/* 4. Lista e Cards Padronizados */}
       {isLoading ? (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color="#10b981" />
+          <ActivityIndicator size="large" color="#1b7d52" />
           <Text style={styles.loadingText}>Carregando talhões...</Text>
         </View>
       ) : (
         <FlatList
           data={filteredFields}
           keyExtractor={(item, index) => String(item?.id || index)}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, isDesktop && styles.listContentDesktop]}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={handleRefresh}
+              colors={["#10b981"]}
+            />
+          }
           renderItem={({ item }) => {
             const farmObj = farms.find((f) => f.id === item.fazenda);
             const farmNome = item.fazenda_nome || farmObj?.nome || "Fazenda Vinculada";
             const farmFilial = item.fazenda_filial || farmObj?.filial || farmObj?.codigo || "";
 
             return (
-              <View style={styles.fieldCard}>
-                {/* Linha Superior: Código e Fazenda */}
+              <View style={[styles.recordCard, isDesktop && styles.recordCardDesktop]}>
+                {/* Linha Superior: Código + Descrição + Ações */}
                 <View style={styles.cardHeaderRow}>
-                  <View style={styles.codeGroup}>
-                    <View style={styles.codeBadge}>
-                      <Text style={styles.codeBadgeText}>{item.codigo}</Text>
+                  <View style={styles.cardTitleGroup}>
+                    <View style={styles.cardIconBox}>
+                      <Grid3x3 size={18} color="#10b981" />
                     </View>
-                    <Text style={styles.fieldDescription} numberOfLines={2}>
-                      {item.descricao || item.nome || "—"}
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={styles.cardTitle} numberOfLines={1}>
+                          {item.codigo}
+                        </Text>
+                        <View style={styles.codeTag}>
+                          <Text style={styles.codeTagText}>TALHÃO</Text>
+                        </View>
+                      </View>
+                      <Text style={styles.cardSubtitle} numberOfLines={1}>
+                        {item.descricao || item.nome || "Sem descrição"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.cardActionButtons}>
+                    <TouchableOpacity
+                      style={styles.actionBtn}
+                      onPress={() => handleOpenEdit(item)}
+                      activeOpacity={0.7}
+                    >
+                      <Edit2 size={15} color="#0f766e" />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.actionBtnDelete}
+                      onPress={() => setFieldToDelete(item)}
+                      activeOpacity={0.7}
+                    >
+                      <Trash2 size={15} color="#dc2626" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Grade de Métricas Padronizada (3 colunas) */}
+                <View style={styles.metricsGrid}>
+                  <View style={styles.metricCol}>
+                    <Text style={styles.metricLabel}>FAZENDA</Text>
+                    <Text style={styles.metricValue} numberOfLines={1}>
+                      {farmNome}
                     </Text>
                   </View>
-                  {item.id_pims ? (
-                    <View style={styles.pimsBadge}>
-                      <Text style={styles.pimsBadgeText}>PIMS: {item.id_pims}</Text>
-                    </View>
-                  ) : null}
-                </View>
-
-                {/* Linha da Fazenda Vinculada */}
-                <View style={styles.farmRow}>
-                  <Building2 size={13} color="#059669" />
-                  <Text style={styles.farmNameText} numberOfLines={1}>
-                    {farmNome}
-                  </Text>
-                  {farmFilial ? (
-                    <View style={styles.filialTag}>
-                      <Text style={styles.filialTagText}>Filial {farmFilial}</Text>
-                    </View>
-                  ) : null}
-                </View>
-
-                {/* Linha do ID com Cópia */}
-                <View style={styles.idRow}>
-                  <Text style={styles.idLabel}>ID:</Text>
-                  <Text style={styles.idValue} numberOfLines={1}>
-                    {item.id}
-                  </Text>
-                  <TouchableOpacity
-                    style={styles.copyButton}
-                    onPress={() => handleCopyId(item.id)}
-                    activeOpacity={0.7}
-                  >
-                    {copiedId === item.id ? (
-                      <Check size={14} color="#10b981" />
-                    ) : (
-                      <Copy size={14} color="#64748b" />
-                    )}
-                    <Text style={styles.copyButtonText}>
-                      {copiedId === item.id ? "Copiado!" : "Copiar"}
+                  <View style={styles.metricCol}>
+                    <Text style={styles.metricLabel}>FILIAL</Text>
+                    <Text style={styles.metricValue}>
+                      {farmFilial || "—"}
                     </Text>
-                  </TouchableOpacity>
+                  </View>
+                  <View style={styles.metricCol}>
+                    <Text style={styles.metricLabel}>ID PIMS</Text>
+                    <Text style={styles.metricValue} numberOfLines={1}>
+                      {item.id_pims || "—"}
+                    </Text>
+                  </View>
                 </View>
 
-                {/* Linha de Ações: Editar e Excluir */}
-                <View style={styles.cardActionsRow}>
-                  <TouchableOpacity
-                    style={styles.editButton}
-                    onPress={() => handleOpenEdit(item)}
-                    activeOpacity={0.7}
-                  >
-                    <Edit2 size={14} color="#0f766e" />
-                    <Text style={styles.editButtonText}>Editar</Text>
-                  </TouchableOpacity>
+                {/* Rodapé: ID do Sistema com botão de cópia */}
+                <View style={styles.cardFooter}>
+                  <View style={styles.idGroup}>
+                    <Text style={styles.idLabel}>ID:</Text>
+                    <Text style={styles.idValue} numberOfLines={1}>
+                      {item.id.slice(0, 10)}...
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.copyBtn}
+                      onPress={() => handleCopyId(item.id)}
+                      activeOpacity={0.7}
+                    >
+                      {copiedId === item.id ? (
+                        <Check size={12} color="#10b981" />
+                      ) : (
+                        <Copy size={12} color="#64748b" />
+                      )}
+                      <Text style={styles.copyBtnText}>
+                        {copiedId === item.id ? "Copiado!" : "Copiar"}
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
 
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => setFieldToDelete(item)}
-                    activeOpacity={0.7}
-                  >
-                    <Trash2 size={14} color="#dc2626" />
-                    <Text style={styles.deleteButtonText}>Excluir</Text>
-                  </TouchableOpacity>
+                  <View style={styles.statusPill}>
+                    <Text style={styles.statusPillText}>Ativo</Text>
+                  </View>
                 </View>
               </View>
             );
           }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Grid3x3 size={42} color="#cbd5e1" />
+              <View style={styles.emptyIconBox}>
+                <Grid3x3 size={36} color="#94a3b8" />
+              </View>
               <Text style={styles.emptyTitle}>Nenhum talhão encontrado</Text>
               <Text style={styles.emptySubtitle}>
-                {searchTerm || selectedFarmFilter !== "ALL"
-                  ? "Tente alterar os filtros ou o termo de busca."
+                {searchTerm.length > 0
+                  ? "Tente refinar sua busca por código ou fazenda."
                   : farms.length === 0
-                  ? "Cadastre uma fazenda para começar a registrar seus talhões."
+                  ? "Cadastre primeiro uma fazenda para vincular seus talhões."
                   : "Toque em '+ Novo' para cadastrar o primeiro talhão."}
               </Text>
+              {farms.length === 0 && onNavigateToFarms ? (
+                <TouchableOpacity
+                  style={styles.emptyCreateButton}
+                  onPress={onNavigateToFarms}
+                  activeOpacity={0.8}
+                >
+                  <Building2 size={16} color="#ffffff" />
+                  <Text style={styles.emptyCreateButtonText}>Cadastrar Fazenda</Text>
+                </TouchableOpacity>
+              ) : (
+                searchTerm.length === 0 && (
+                  <TouchableOpacity
+                    style={styles.emptyCreateButton}
+                    onPress={handleOpenCreate}
+                    activeOpacity={0.8}
+                  >
+                    <Plus size={16} color="#ffffff" />
+                    <Text style={styles.emptyCreateButtonText}>Cadastrar Primeiro Talhão</Text>
+                  </TouchableOpacity>
+                )
+              )}
             </View>
           }
         />
@@ -445,12 +478,17 @@ export function FieldsScreen({ onNavigateToFarms, initialFarmId }: FieldsScreenP
         onRequestClose={() => setIsModalOpen(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
+          <View style={[styles.modalCard, isDesktop && styles.modalCardDesktop]}>
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>
-                {editingField ? "Editar Talhão" : "Novo Talhão"}
-              </Text>
-              <TouchableOpacity onPress={() => setIsModalOpen(false)}>
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <View style={styles.modalHeaderIcon}>
+                  <Grid3x3 size={18} color="#10b981" />
+                </View>
+                <Text style={styles.modalTitle}>
+                  {editingField ? "Editar Talhão" : "Novo Talhão"}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsModalOpen(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
                 <X size={20} color="#64748b" />
               </TouchableOpacity>
             </View>
@@ -467,14 +505,14 @@ export function FieldsScreen({ onNavigateToFarms, initialFarmId }: FieldsScreenP
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Fazenda Vinculada *</Text>
                 <TouchableOpacity
-                  style={styles.farmSelectButton}
-                  onPress={() => setShowFarmPicker(true)}
-                  activeOpacity={0.7}
+                  style={styles.pickerSelector}
+                  onPress={() => setShowFarmPicker(!showFarmPicker)}
+                  activeOpacity={0.8}
                 >
                   <Building2 size={16} color="#64748b" />
                   <Text
                     style={[
-                      styles.farmSelectText,
+                      styles.pickerSelectorText,
                       !selectedFarmObj && { color: "#94a3b8" },
                     ]}
                     numberOfLines={1}
@@ -485,25 +523,49 @@ export function FieldsScreen({ onNavigateToFarms, initialFarmId }: FieldsScreenP
                   </Text>
                   <ChevronDown size={16} color="#64748b" />
                 </TouchableOpacity>
-                <Text style={styles.inputHelp}>
-                  Unidade agrícola à qual este lote agronômico pertence.
-                </Text>
+
+                {showFarmPicker && (
+                  <View style={styles.pickerDropdown}>
+                    <ScrollView style={{ maxHeight: 180 }} nestedScrollEnabled>
+                      {farms.map((f) => (
+                        <TouchableOpacity
+                          key={f.id}
+                          style={[
+                            styles.pickerOption,
+                            formFazendaId === f.id && styles.pickerOptionActive,
+                          ]}
+                          onPress={() => {
+                            setFormFazendaId(f.id);
+                            setShowFarmPicker(false);
+                          }}
+                        >
+                          <Text
+                            style={[
+                              styles.pickerOptionText,
+                              formFazendaId === f.id && styles.pickerOptionTextActive,
+                            ]}
+                          >
+                            {f.nome} (Filial {f.filial || f.codigo})
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
               </View>
 
-              {/* Campo Código */}
+              {/* Campo Código do Talhão */}
               <View style={styles.inputGroup}>
                 <Text style={styles.inputLabel}>Código do Talhão *</Text>
                 <TextInput
                   style={[styles.input, styles.inputUppercase]}
-                  placeholder="Ex: TAL-01, 102, T-A"
+                  placeholder="Ex: TAL-01"
                   placeholderTextColor="#94a3b8"
                   value={formCodigo}
                   onChangeText={(text) => setFormCodigo(text.toUpperCase())}
                   autoCapitalize="characters"
                 />
-                <Text style={styles.inputHelp}>
-                  Código operacional único dentro da fazenda.
-                </Text>
+                <Text style={styles.inputHelp}>Identificador operacional na fazenda.</Text>
               </View>
 
               {/* Campo Descrição */}
@@ -511,28 +573,26 @@ export function FieldsScreen({ onNavigateToFarms, initialFarmId }: FieldsScreenP
                 <Text style={styles.inputLabel}>Descrição do Talhão *</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Ex: Talhão Pivô 01 Sede, Lote Norte Soja"
+                  placeholder="Ex: Talhão Central - Pivô 01"
                   placeholderTextColor="#94a3b8"
                   value={formDescricao}
                   onChangeText={setFormDescricao}
                 />
-                <Text style={styles.inputHelp}>
-                  Identificador textual ou descrição das atividades.
-                </Text>
               </View>
 
-              {/* Campo ID PIMS (Opcional) */}
+              {/* Campo ID PIMS */}
               <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>ID do PIMS (Opcional)</Text>
+                <Text style={styles.inputLabel}>ID PIMS (Opcional)</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Ex: 90210, TLH-PIMS-01"
+                  placeholder="Ex: PIMS-TAL-001"
                   placeholderTextColor="#94a3b8"
                   value={formIdPims}
                   onChangeText={setFormIdPims}
+                  maxLength={50}
                 />
                 <Text style={styles.inputHelp}>
-                  Identificador correspondente no sistema PIMS (não obrigatório).
+                  Identificador para integrações externas.
                 </Text>
               </View>
             </ScrollView>
@@ -555,7 +615,7 @@ export function FieldsScreen({ onNavigateToFarms, initialFarmId }: FieldsScreenP
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
                   <Text style={styles.modalSubmitButtonText}>
-                    {editingField ? "Salvar" : "Cadastrar"}
+                    {editingField ? "Salvar Alterações" : "Cadastrar Talhão"}
                   </Text>
                 )}
               </TouchableOpacity>
@@ -564,75 +624,7 @@ export function FieldsScreen({ onNavigateToFarms, initialFarmId }: FieldsScreenP
         </View>
       </Modal>
 
-      {/* MODAL PICKER: Selecionar Fazenda para o Talhão */}
-      <Modal
-        visible={showFarmPicker}
-        animationType="fade"
-        transparent={true}
-        onRequestClose={() => setShowFarmPicker(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.pickerModalCard}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Selecionar Fazenda</Text>
-              <TouchableOpacity onPress={() => setShowFarmPicker(false)}>
-                <X size={20} color="#64748b" />
-              </TouchableOpacity>
-            </View>
-
-            <FlatList
-              data={farms}
-              keyExtractor={(f) => f.id}
-              contentContainerStyle={{ padding: 12, gap: 8 }}
-              renderItem={({ item }) => {
-                const isSelected = item.id === formFazendaId;
-                return (
-                  <TouchableOpacity
-                    style={[
-                      styles.farmPickerItem,
-                      isSelected && styles.farmPickerItemSelected,
-                    ]}
-                    onPress={() => {
-                      setFormFazendaId(item.id);
-                      setShowFarmPicker(false);
-                    }}
-                  >
-                    <Building2
-                      size={18}
-                      color={isSelected ? "#10b981" : "#64748b"}
-                    />
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        style={[
-                          styles.farmPickerName,
-                          isSelected && styles.farmPickerNameSelected,
-                        ]}
-                      >
-                        {item.nome}
-                      </Text>
-                      {item.filial && (
-                        <Text style={styles.farmPickerFilial}>
-                          Filial: {item.filial}
-                        </Text>
-                      )}
-                    </View>
-                    {isSelected && <Check size={18} color="#10b981" />}
-                  </TouchableOpacity>
-                );
-              }}
-              ListEmptyComponent={
-                <View style={{ padding: 24, alignItems: "center" }}>
-                  <Text style={{ fontSize: 13, color: "#94a3b8" }}>
-                    Nenhuma fazenda cadastrada.
-                  </Text>
-                </View>
-              }
-            />
-          </View>
-        </View>
-      </Modal>
-
-      {/* MODAL: Confirmação de Exclusão de Talhão */}
+      {/* MODAL: Confirmação de Exclusão */}
       <Modal
         visible={Boolean(fieldToDelete)}
         animationType="fade"
@@ -640,7 +632,7 @@ export function FieldsScreen({ onNavigateToFarms, initialFarmId }: FieldsScreenP
         onRequestClose={() => setFieldToDelete(null)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.deleteModalCard}>
+          <View style={[styles.deleteModalCard, isDesktop && styles.modalCardDesktop]}>
             <View style={styles.deleteModalHeader}>
               <View style={styles.deleteIconBadge}>
                 <Trash2 size={24} color="#dc2626" />
@@ -650,12 +642,12 @@ export function FieldsScreen({ onNavigateToFarms, initialFarmId }: FieldsScreenP
 
             <Text style={styles.deleteModalMessage}>
               Tem certeza que deseja excluir o talhão{" "}
-              <Text style={{ fontWeight: "700" }}>"{fieldToDelete?.codigo}"</Text>{" "}
-              ({fieldToDelete?.descricao || fieldToDelete?.nome})?
+              <Text style={{ fontWeight: "700", color: "#0f172a" }}>"{fieldToDelete?.codigo}"</Text>
+              {fieldToDelete?.descricao ? ` (${fieldToDelete.descricao})` : ""}?
             </Text>
 
             <Text style={styles.deleteModalWarning}>
-              Esta ação é definitiva e removerá este talhão da fazenda.
+              Esta ação é irreversível e removerá o cadastro definitivamente.
             </Text>
 
             <View style={styles.deleteModalFooter}>
@@ -668,14 +660,14 @@ export function FieldsScreen({ onNavigateToFarms, initialFarmId }: FieldsScreenP
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.confirmDeleteButton}
+                style={styles.deleteModalConfirmButton}
                 onPress={handleConfirmDelete}
                 disabled={isDeleting}
               >
                 {isDeleting ? (
                   <ActivityIndicator size="small" color="#ffffff" />
                 ) : (
-                  <Text style={styles.confirmDeleteButtonText}>Sim, Excluir</Text>
+                  <Text style={styles.deleteModalConfirmText}>Confirmar Exclusão</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -692,36 +684,44 @@ const styles = StyleSheet.create({
     backgroundColor: "#f8fafc",
   },
   screenHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
     borderBottomColor: "#e2e8f0",
   },
-  screenHeaderTitleGroup: {
+  screenTitleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 10,
   },
-  iconBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: "rgba(16, 185, 129, 0.12)",
-    justifyContent: "center",
+  screenTitleGroup: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 12,
+  },
+  screenIconBox: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    alignItems: "center",
+    justifyContent: "center",
   },
   screenTitle: {
-    fontSize: 16,
-    fontWeight: "700",
+    fontSize: 18,
+    fontWeight: "800",
     color: "#0f172a",
+    letterSpacing: -0.3,
   },
   screenSubtitle: {
     fontSize: 11,
     color: "#64748b",
+    marginTop: 2,
+    fontWeight: "500",
   },
   headerActions: {
     flexDirection: "row",
@@ -729,105 +729,48 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   refreshButton: {
-    width: 34,
-    height: 34,
-    borderRadius: 6,
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: "#f8fafc",
     borderWidth: 1,
     borderColor: "#e2e8f0",
-    justifyContent: "center",
     alignItems: "center",
-    backgroundColor: "#f8fafc",
+    justifyContent: "center",
   },
   createButton: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
-    backgroundColor: "#10b981",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
+    gap: 6,
+    backgroundColor: "#1b7d52",
+    paddingHorizontal: 14,
+    height: 36,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
   },
   createButtonText: {
     color: "#ffffff",
     fontSize: 12,
     fontWeight: "700",
   },
-  noFarmsBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: "#fef3c7",
-    borderBottomWidth: 1,
-    borderBottomColor: "#fde68a",
+  searchBarContainer: {
     paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  noFarmsBannerTitle: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: "#92400e",
-  },
-  noFarmsBannerText: {
-    fontSize: 11,
-    color: "#b45309",
-    marginTop: 1,
-  },
-  noFarmsBannerBtn: {
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#fde68a",
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 6,
-  },
-  noFarmsBannerBtnText: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#92400e",
-  },
-  filterSection: {
-    backgroundColor: "#ffffff",
-    paddingTop: 10,
     paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
-  },
-  farmPillsScroll: {
-    paddingHorizontal: 16,
-    gap: 8,
-    paddingBottom: 8,
-  },
-  farmPill: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    backgroundColor: "#f1f5f9",
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-  },
-  farmPillActive: {
-    backgroundColor: "#10b981",
-    borderColor: "#10b981",
-  },
-  farmPillText: {
-    fontSize: 12,
-    color: "#475569",
-    fontWeight: "600",
-  },
-  farmPillTextActive: {
-    color: "#ffffff",
-    fontWeight: "700",
   },
   searchBox: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f1f5f9",
+    backgroundColor: "#f8fafc",
     borderRadius: 8,
     paddingHorizontal: 12,
-    marginHorizontal: 16,
     height: 40,
     gap: 8,
-    marginTop: 4,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
   },
   searchInput: {
     flex: 1,
@@ -835,372 +778,480 @@ const styles = StyleSheet.create({
     color: "#0f172a",
     paddingVertical: 0,
   },
-  counterText: {
-    fontSize: 11,
-    color: "#64748b",
-    marginTop: 6,
-    marginHorizontal: 16,
+  filterChipScroll: {
+    borderTopWidth: 1,
+    borderTopColor: "#f1f5f9",
   },
+  filterChipContent: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  filterChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 20,
+    backgroundColor: "#f1f5f9",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  filterChipActive: {
+    backgroundColor: "#1b7d52",
+    borderColor: "#1b7d52",
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#475569",
+  },
+  filterChipTextActive: {
+    color: "#ffffff",
+  },
+
+  // Lista e Cards
   listContent: {
     padding: 16,
     gap: 12,
+    paddingBottom: 32,
   },
-  fieldCard: {
+  listContentDesktop: {
+    alignItems: "center",
+  },
+  recordCard: {
     backgroundColor: "#ffffff",
-    borderRadius: 10,
-    padding: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#e2e8f0",
+    padding: 14,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOpacity: 0.04,
+    shadowRadius: 3,
     elevation: 1,
   },
+  recordCardDesktop: {
+    maxWidth: 960,
+    width: "100%",
+  },
   cardHeaderRow: {
-    marginBottom: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
   },
-  codeGroup: {
-    gap: 6,
+  cardTitleGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
   },
-  codeBadge: {
-    backgroundColor: "#0f172a",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-    alignSelf: "flex-start",
+  cardIconBox: {
+    width: 34,
+    height: 34,
+    borderRadius: 8,
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  codeBadgeText: {
-    color: "#ffffff",
-    fontSize: 12,
+  cardTitle: {
+    fontSize: 15,
     fontWeight: "800",
-    fontFamily: "monospace",
-  },
-  fieldDescription: {
-    fontSize: 14,
-    fontWeight: "600",
     color: "#0f172a",
   },
-  farmRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 10,
-  },
-  farmNameText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#0f766e",
-    maxWidth: 180,
-  },
-  filialTag: {
-    backgroundColor: "rgba(16, 185, 129, 0.12)",
+  codeTag: {
+    backgroundColor: "#f1f5f9",
     paddingHorizontal: 6,
-    paddingVertical: 2,
+    paddingVertical: 1,
     borderRadius: 4,
-  },
-  filialTagText: {
-    fontSize: 10,
-    color: "#059669",
-    fontWeight: "700",
-    fontFamily: "monospace",
-  },
-  idRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f8fafc",
-    paddingHorizontal: 8,
-    paddingVertical: 6,
-    borderRadius: 6,
-    marginBottom: 10,
-    gap: 6,
-  },
-  idLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: "#94a3b8",
-  },
-  idValue: {
-    flex: 1,
-    fontSize: 11,
-    color: "#64748b",
-    fontFamily: "monospace",
-  },
-  copyButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 3,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    backgroundColor: "#ffffff",
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
-  copyButtonText: {
-    fontSize: 10,
+  codeTagText: {
+    fontSize: 9,
+    fontWeight: "700",
     color: "#64748b",
-    fontWeight: "600",
   },
-  cardActionsRow: {
+  cardSubtitle: {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 1,
+    fontWeight: "500",
+  },
+  cardActionButtons: {
     flexDirection: "row",
-    justifyContent: "flex-end",
     alignItems: "center",
-    gap: 8,
+    gap: 6,
+  },
+  actionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: "#f0fdf4",
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  actionBtnDelete: {
+    width: 32,
+    height: 32,
+    borderRadius: 6,
+    backgroundColor: "#fef2f2",
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  // Grade de Métricas
+  metricsGrid: {
+    flexDirection: "row",
+    backgroundColor: "#f8fafc",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#f1f5f9",
+    padding: 10,
+    marginBottom: 12,
+  },
+  metricCol: {
+    flex: 1,
+  },
+  metricLabel: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#64748b",
+    textTransform: "uppercase",
+    letterSpacing: 0.3,
+    marginBottom: 2,
+  },
+  metricValue: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0f172a",
+  },
+
+  // Rodapé do Card
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     borderTopWidth: 1,
     borderTopColor: "#f1f5f9",
     paddingTop: 10,
   },
-  editButton: {
+  idGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  idLabel: {
+    fontSize: 10,
+    color: "#94a3b8",
+    fontWeight: "600",
+  },
+  idValue: {
+    fontSize: 11,
+    fontFamily: "monospace",
+    color: "#64748b",
+  },
+  copyBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: "rgba(15, 118, 110, 0.08)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: "#f1f5f9",
   },
-  editButtonText: {
-    fontSize: 12,
+  copyBtnText: {
+    fontSize: 10,
     fontWeight: "600",
-    color: "#0f766e",
+    color: "#64748b",
   },
-  deleteButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 6,
-    backgroundColor: "rgba(220, 38, 38, 0.08)",
+  statusPill: {
+    backgroundColor: "#ecfdf5",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
   },
-  deleteButtonText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#dc2626",
+  statusPillText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#047857",
   },
+
+  // Estados Centrais e Vazios
   centerContainer: {
     flex: 1,
-    justifyContent: "center",
     alignItems: "center",
-    gap: 8,
+    justifyContent: "center",
+    padding: 32,
   },
   loadingText: {
+    marginTop: 12,
     fontSize: 13,
     color: "#64748b",
+    fontWeight: "500",
   },
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 48,
-    gap: 8,
+    paddingHorizontal: 24,
+  },
+  emptyIconBox: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: "#f1f5f9",
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 14,
   },
   emptyTitle: {
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "700",
     color: "#0f172a",
+    marginBottom: 4,
   },
   emptySubtitle: {
     fontSize: 12,
-    color: "#94a3b8",
+    color: "#64748b",
     textAlign: "center",
-    maxWidth: 240,
+    maxWidth: 280,
+    lineHeight: 18,
   },
+  emptyCreateButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "#1b7d52",
+    paddingHorizontal: 16,
+    height: 40,
+    borderRadius: 8,
+    marginTop: 16,
+  },
+  emptyCreateButtonText: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontWeight: "700",
+  },
+
+  // Modais
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
     justifyContent: "center",
     alignItems: "center",
     padding: 16,
   },
   modalCard: {
     backgroundColor: "#ffffff",
-    borderRadius: 14,
+    borderRadius: 16,
     width: "100%",
-    maxHeight: "85%",
+    maxWidth: 480,
+    maxHeight: "90%",
     overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  pickerModalCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 14,
-    width: "100%",
-    maxHeight: "75%",
-    overflow: "hidden",
+  modalCardDesktop: {
+    maxWidth: 520,
   },
   modalHeader: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 18,
-    paddingVertical: 14,
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#f1f5f9",
+    borderBottomColor: "#e2e8f0",
+  },
+  modalHeaderIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "#ecfdf5",
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalTitle: {
     fontSize: 16,
-    fontWeight: "700",
+    fontWeight: "800",
     color: "#0f172a",
+  },
+  modalBody: {
+    padding: 20,
+  },
+  inputGroup: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#334155",
+    marginBottom: 6,
+  },
+  input: {
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
+    color: "#0f172a",
+  },
+  inputUppercase: {
+    textTransform: "uppercase",
+  },
+  inputHelp: {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 4,
+  },
+  pickerSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f8fafc",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  pickerSelectorText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#0f172a",
+  },
+  pickerDropdown: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    marginTop: 4,
+    overflow: "hidden",
+  },
+  pickerOption: {
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#f1f5f9",
+  },
+  pickerOptionActive: {
+    backgroundColor: "#ecfdf5",
+  },
+  pickerOptionText: {
+    fontSize: 13,
+    color: "#334155",
+  },
+  pickerOptionTextActive: {
+    color: "#1b7d52",
+    fontWeight: "700",
   },
   errorBanner: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: "#fee2e2",
-    marginHorizontal: 18,
-    marginTop: 12,
+    backgroundColor: "#fef2f2",
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    marginHorizontal: 20,
+    marginTop: 14,
     padding: 10,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   errorBannerText: {
-    flex: 1,
-    fontSize: 11,
-    color: "#b91c1c",
-  },
-  modalBody: {
-    paddingHorizontal: 18,
-    paddingVertical: 14,
-  },
-  inputGroup: {
-    marginBottom: 14,
-  },
-  inputLabel: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#334155",
-    marginBottom: 6,
-  },
-  farmSelectButton: {
-    height: 44,
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    backgroundColor: "#ffffff",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  farmSelectText: {
+    color: "#b91c1c",
     flex: 1,
-    fontSize: 13,
-    color: "#0f172a",
-  },
-  farmPickerItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    backgroundColor: "#f8fafc",
-  },
-  farmPickerItemSelected: {
-    borderColor: "#10b981",
-    backgroundColor: "rgba(16, 185, 129, 0.08)",
-  },
-  farmPickerName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#0f172a",
-  },
-  farmPickerNameSelected: {
-    color: "#059669",
-    fontWeight: "700",
-  },
-  farmPickerFilial: {
-    fontSize: 11,
-    color: "#64748b",
-    marginTop: 2,
-  },
-  input: {
-    height: 42,
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    fontSize: 14,
-    backgroundColor: "#ffffff",
-    color: "#0f172a",
-  },
-  inputUppercase: {
-    fontWeight: "600",
-    fontFamily: "monospace",
-  },
-  inputHelp: {
-    fontSize: 11,
-    color: "#94a3b8",
-    marginTop: 4,
+    fontWeight: "500",
   },
   modalFooter: {
     flexDirection: "row",
     justifyContent: "flex-end",
+    alignItems: "center",
     gap: 10,
-    paddingHorizontal: 18,
-    paddingVertical: 12,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
     borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
+    borderTopColor: "#e2e8f0",
+    backgroundColor: "#f8fafc",
   },
   modalCancelButton: {
     paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 6,
+    paddingVertical: 10,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#cbd5e1",
+    backgroundColor: "#ffffff",
   },
   modalCancelButtonText: {
     fontSize: 13,
-    color: "#64748b",
     fontWeight: "600",
+    color: "#475569",
   },
   modalSubmitButton: {
-    backgroundColor: "#10b981",
     paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 6,
-    minWidth: 90,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#1b7d52",
+    minWidth: 120,
     alignItems: "center",
   },
   modalSubmitButtonText: {
     fontSize: 13,
-    color: "#ffffff",
     fontWeight: "700",
+    color: "#ffffff",
   },
+
+  // Modal de Exclusão
   deleteModalCard: {
     backgroundColor: "#ffffff",
-    borderRadius: 14,
-    padding: 20,
+    borderRadius: 16,
     width: "100%",
+    maxWidth: 440,
+    padding: 20,
   },
   deleteModalHeader: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
-    marginBottom: 12,
+    gap: 12,
+    marginBottom: 14,
   },
   deleteIconBadge: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: "#fee2e2",
-    justifyContent: "center",
     alignItems: "center",
+    justifyContent: "center",
   },
   deleteModalTitle: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: "#dc2626",
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0f172a",
   },
   deleteModalMessage: {
     fontSize: 13,
-    color: "#334155",
-    lineHeight: 18,
-    marginBottom: 10,
+    color: "#475569",
+    lineHeight: 20,
+    marginBottom: 12,
   },
   deleteModalWarning: {
     fontSize: 11,
-    color: "#94a3b8",
-    marginBottom: 16,
+    color: "#dc2626",
+    marginBottom: 14,
+    fontWeight: "500",
   },
   deleteModalFooter: {
     flexDirection: "row",
@@ -1208,29 +1259,16 @@ const styles = StyleSheet.create({
     gap: 10,
     marginTop: 8,
   },
-  confirmDeleteButton: {
-    backgroundColor: "#dc2626",
+  deleteModalConfirmButton: {
     paddingHorizontal: 16,
-    paddingVertical: 9,
-    borderRadius: 6,
-    minWidth: 100,
+    paddingVertical: 10,
+    borderRadius: 8,
+    backgroundColor: "#dc2626",
     alignItems: "center",
   },
-  confirmDeleteButtonText: {
-    color: "#ffffff",
+  deleteModalConfirmText: {
     fontSize: 13,
     fontWeight: "700",
-  },
-  pimsBadge: {
-    backgroundColor: "#f1f5f9",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    alignSelf: "flex-start",
-  },
-  pimsBadgeText: {
-    fontSize: 10,
-    color: "#475569",
-    fontWeight: "600",
+    color: "#ffffff",
   },
 });

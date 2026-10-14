@@ -9,45 +9,44 @@ import {
   Modal,
   ScrollView,
   Dimensions,
-  Animated,
+  TextInput,
+  Alert,
 } from "react-native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
 import {
   Menu,
   X,
   CircleGauge,
+  CalendarDays,
+  Calendar,
   Building2,
   Grid3x3,
-  Calendar,
-  Zap,
+  Sprout,
   RefreshCw,
+  Settings,
   LogOut,
   Leaf,
   ChevronRight,
-  User as UserIcon,
-  Layers,
   AlertCircle,
+  Server,
+  Check,
 } from "lucide-react-native";
-import { MobilePivot } from "./src/types";
-import { PivotsScreen } from "./src/screens/PivotsScreen";
-import { PivotDetailScreen } from "./src/screens/PivotDetailScreen";
-import { IrrigationFormScreen } from "./src/screens/IrrigationFormScreen";
 import { SyncQueueScreen } from "./src/screens/SyncQueueScreen";
 import { PlanningScreen } from "./src/screens/PlanningScreen";
-import { OpportunitiesScreen } from "./src/screens/OpportunitiesScreen";
 import { FarmsScreen } from "./src/screens/FarmsScreen";
 import { FieldsScreen } from "./src/screens/FieldsScreen";
+import { SeasonsScreen } from "./src/screens/SeasonsScreen";
+import { CropsScreen } from "./src/screens/CropsScreen";
 import { LoginScreen } from "./src/screens/LoginScreen";
-import { mobileApi, setOnUnauthorized } from "./src/services/api";
+import { mobileApi, setOnUnauthorized, getApiUrl, setApiUrl } from "./src/services/api";
 
 type ScreenName =
-  | "pivots"
+  | "cockpit"
+  | "planning"
+  | "seasons"
   | "farms"
   | "fields"
-  | "planning"
-  | "opportunities"
-  | "pivot_detail"
-  | "irrigation_form"
+  | "crops"
   | "sync_queue";
 
 const { width } = Dimensions.get("window");
@@ -73,7 +72,7 @@ class AppErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <SafeAreaView style={styles.errorContainer}>
-          <StatusBar barStyle="light-content" backgroundColor="#0a1812" />
+          <StatusBar barStyle="light-content" backgroundColor="#0d281e" />
           <View style={styles.errorIconBox}>
             <AlertCircle size={32} color="#ef4444" />
           </View>
@@ -110,13 +109,17 @@ function AppContent() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentUser, setCurrentUser] = useState<any | null>(null);
 
-  const [currentScreen, setCurrentScreen] = useState<ScreenName>("pivots");
-  const [previousScreen, setPreviousScreen] = useState<ScreenName>("pivots");
-  const [selectedPivot, setSelectedPivot] = useState<MobilePivot | undefined>(undefined);
+  // Tela padrão: Cockpit Operacional (Gantt)
+  const [currentScreen, setCurrentScreen] = useState<ScreenName>("cockpit");
+  const [previousScreen, setPreviousScreen] = useState<ScreenName>("cockpit");
   const [targetFarmIdForFields, setTargetFarmIdForFields] = useState<string | undefined>(undefined);
 
-  // Controle do Menu Lateral (Drawer)
+  // Controle do Menu Lateral (Drawer) e Modal de Configurações
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [customApiUrl, setCustomApiUrl] = useState(getApiUrl());
+  const [isTestingApi, setIsTestingApi] = useState(false);
+  const [settingsFeedback, setSettingsFeedback] = useState<string | null>(null);
 
   const role = currentUser?.profile?.role || "OPERADOR";
   const roleDisplay = currentUser?.profile?.role_display || role;
@@ -153,7 +156,7 @@ function AppContent() {
   const handleLoginSuccess = (user: any) => {
     setCurrentUser(user);
     setIsAuthenticated(true);
-    setCurrentScreen("pivots");
+    setCurrentScreen("cockpit");
   };
 
   const handleLogout = async () => {
@@ -163,43 +166,50 @@ function AppContent() {
     setCurrentUser(null);
   };
 
-  const handleSelectPivot = (pivot: MobilePivot) => {
-    setSelectedPivot(pivot);
-    setCurrentScreen("pivot_detail");
-  };
-
-  const handleOpenIrrigation = (pivot?: MobilePivot) => {
-    if (isConsultor) {
-      alert("Acesso de consulta: Consultores não têm permissão para criar apontamentos de irrigação.");
-      return;
-    }
-    if (pivot) setSelectedPivot(pivot);
-    setCurrentScreen("irrigation_form");
-  };
-
   const navigateTo = (screen: ScreenName) => {
     setCurrentScreen(screen);
     setIsDrawerOpen(false);
   };
 
+  const handleSaveApiUrl = async () => {
+    if (!customApiUrl.trim()) return;
+    await setApiUrl(customApiUrl.trim());
+    setSettingsFeedback("URL da API atualizada com sucesso!");
+    setTimeout(() => setSettingsFeedback(null), 3000);
+  };
+
+  const handleTestApiConnection = async () => {
+    setIsTestingApi(true);
+    setSettingsFeedback(null);
+    try {
+      if (customApiUrl.trim()) {
+        await setApiUrl(customApiUrl.trim());
+      }
+      await mobileApi.checkHealth();
+      setSettingsFeedback("✓ Conexão bem-sucedida com a API!");
+    } catch (err: any) {
+      setSettingsFeedback(`❌ Inacessível: ${err.message}`);
+    } finally {
+      setIsTestingApi(false);
+    }
+  };
+
   const getScreenTitle = () => {
     switch (currentScreen) {
-      case "pivots":
-        return "Cockpit de Pivôs";
-      case "farms":
-        return "Cadastro de Fazendas";
-      case "fields":
-        return "Cadastro de Talhões";
+      case "cockpit":
+        return "Cockpit";
       case "planning":
-        return "Planejamento de Safras";
-      case "opportunities":
-        return "Janelas de Oportunidade";
+        return "Planejamento";
+      case "seasons":
+        return "Safras";
+      case "farms":
+        return "Fazendas";
+      case "fields":
+        return "Talhões";
+      case "crops":
+        return "Culturas";
       case "sync_queue":
-        return "Fila de Sincronização";
-      case "pivot_detail":
-        return selectedPivot ? `Pivô ${selectedPivot.codigo}` : "Detalhes do Pivô";
-      case "irrigation_form":
-        return "Novo Apontamento";
+        return "Sincronização Offline";
       default:
         return "Cockpit";
     }
@@ -208,7 +218,7 @@ function AppContent() {
   if (isInitializing) {
     return (
       <SafeAreaView style={styles.splashContainer}>
-        <StatusBar barStyle="light-content" backgroundColor="#0a1812" />
+        <StatusBar barStyle="light-content" backgroundColor="#0d281e" />
         <ActivityIndicator size="large" color="#10b981" />
         <Text style={styles.splashText}>Cockpit de Pivôs · Carregando...</Text>
       </SafeAreaView>
@@ -218,7 +228,7 @@ function AppContent() {
   if (!isAuthenticated) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" backgroundColor="#0a1812" />
+        <StatusBar barStyle="light-content" backgroundColor="#0d281e" />
         <LoginScreen onLoginSuccess={handleLoginSuccess} />
       </SafeAreaView>
     );
@@ -226,457 +236,454 @@ function AppContent() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#0a1812" />
+      <StatusBar barStyle="light-content" backgroundColor="#0d281e" />
 
-        {/* TOP HEADER MODERNO (Estilo Cockpit PC adaptado para Mobile) */}
-        <View style={styles.topHeader}>
-          <View style={styles.headerLeft}>
-            {/* Botão para abrir Menu Lateral */}
-            <TouchableOpacity
-              style={styles.menuButton}
-              onPress={() => setIsDrawerOpen(true)}
-              activeOpacity={0.7}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Menu size={22} color="#ffffff" />
-            </TouchableOpacity>
+      {/* TOP HEADER MODERNO — DESIGN IDÊNTICO AO NAVEGADOR (Com ícone de 3 traços no topo) */}
+      <View style={styles.topHeader}>
+        <View style={styles.headerLeft}>
+          {/* Botão de 3 traços para abrir o Menu Lateral */}
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={() => setIsDrawerOpen(true)}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Menu size={22} color="#ffffff" strokeWidth={2.2} />
+          </TouchableOpacity>
 
-            {/* Brand Logo e Nome */}
-            <View style={styles.brandContainer}>
-              <View style={styles.brandIconBox}>
-                <Leaf size={16} color="#10b981" strokeWidth={2.5} />
-              </View>
-              <View style={styles.brandTitles}>
-                <Text style={styles.brandTitleText}>COCKPIT</Text>
-                <Text style={styles.brandSubtitleText}>DE PIVÔS</Text>
-              </View>
+          {/* Marca / Logo Idêntica ao Navegador */}
+          <TouchableOpacity
+            style={styles.brandContainer}
+            onPress={() => navigateTo("cockpit")}
+            activeOpacity={0.8}
+          >
+            <View style={styles.brandIconBox}>
+              <Leaf size={16} color="#10b981" strokeWidth={2.4} />
             </View>
-          </View>
-
-          {/* Usuário e Role no Header */}
-          <View style={styles.headerRight}>
-            <View style={styles.roleTag}>
-              <Text style={styles.roleTagText}>{role}</Text>
+            <View style={styles.brandTitles}>
+              <Text style={styles.brandTitleText}>COCKPIT</Text>
+              <Text style={styles.brandSubtitleText}>DE PIVÔS</Text>
             </View>
-            <TouchableOpacity
-              style={styles.avatarButton}
-              onPress={() => setIsDrawerOpen(true)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.avatarButtonText}>
-                {(currentUser?.first_name?.[0] || currentUser?.username?.[0] || "U").toUpperCase()}
-              </Text>
-            </TouchableOpacity>
-          </View>
+          </TouchableOpacity>
         </View>
+      </View>
 
-        {/* CONTEÚDO PRINCIPAL (Telas Selecionadas) */}
-        <View style={styles.mainContainer}>
-          <View style={styles.screenContainer}>
-            {currentScreen === "pivots" && (
-              <PivotsScreen
-                onSelectPivot={handleSelectPivot}
-                onOpenSync={() => {
-                  setPreviousScreen("pivots");
-                  setCurrentScreen("sync_queue");
-                }}
-                onOpenNewIrrigation={handleOpenIrrigation}
-              />
-            )}
-
-            {currentScreen === "farms" && (
-              <FarmsScreen
-                onNavigateToFields={(farmId) => {
-                  setTargetFarmIdForFields(farmId);
-                  setCurrentScreen("fields");
-                }}
-              />
-            )}
-
-            {currentScreen === "fields" && (
-              <FieldsScreen
-                onNavigateToFarms={() => setCurrentScreen("farms")}
-                initialFarmId={targetFarmIdForFields}
-              />
-            )}
-
-            {currentScreen === "pivot_detail" && selectedPivot && (
-              <PivotDetailScreen
-                pivot={selectedPivot}
-                onBack={() => setCurrentScreen("pivots")}
-                onOpenIrrigationForm={handleOpenIrrigation}
-              />
-            )}
-
-            {currentScreen === "irrigation_form" && !isConsultor && (
-              <IrrigationFormScreen
-                pivot={selectedPivot}
-                onBack={() => setCurrentScreen(selectedPivot ? "pivot_detail" : "pivots")}
-                onSuccess={() => setCurrentScreen("pivots")}
-              />
-            )}
-
-            {currentScreen === "planning" && (
-              <PlanningScreen
-                onOpenSync={() => {
-                  setPreviousScreen("planning");
-                  setCurrentScreen("sync_queue");
-                }}
-                userRole={role}
-              />
-            )}
-
-            {currentScreen === "opportunities" && (
-              <OpportunitiesScreen
-                onOpenSync={() => {
-                  setPreviousScreen("opportunities");
-                  setCurrentScreen("sync_queue");
-                }}
-                userRole={role}
-              />
-            )}
-
-            {currentScreen === "sync_queue" && (
-              <SyncQueueScreen onBack={() => setCurrentScreen(previousScreen || "pivots")} />
-            )}
-          </View>
-
-          {/* BARRA INFERIOR (Atalhos Rápidos Ergonômicos) */}
-          <View style={styles.bottomBar}>
-            <TouchableOpacity
-              style={[styles.bottomTab, currentScreen === "pivots" && styles.bottomTabActive]}
-              onPress={() => setCurrentScreen("pivots")}
-              activeOpacity={0.7}
-            >
-              <CircleGauge
-                size={20}
-                color={currentScreen === "pivots" ? "#10b981" : "#64748b"}
-              />
-              <Text
-                style={[
-                  styles.bottomTabText,
-                  currentScreen === "pivots" && styles.bottomTabTextActive,
-                ]}
-              >
-                Cockpit
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.bottomTab, currentScreen === "farms" && styles.bottomTabActive]}
-              onPress={() => setCurrentScreen("farms")}
-              activeOpacity={0.7}
-            >
-              <Building2
-                size={20}
-                color={currentScreen === "farms" ? "#10b981" : "#64748b"}
-              />
-              <Text
-                style={[
-                  styles.bottomTabText,
-                  currentScreen === "farms" && styles.bottomTabTextActive,
-                ]}
-              >
-                Fazendas
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.bottomTab, currentScreen === "fields" && styles.bottomTabActive]}
-              onPress={() => setCurrentScreen("fields")}
-              activeOpacity={0.7}
-            >
-              <Grid3x3
-                size={20}
-                color={currentScreen === "fields" ? "#10b981" : "#64748b"}
-              />
-              <Text
-                style={[
-                  styles.bottomTabText,
-                  currentScreen === "fields" && styles.bottomTabTextActive,
-                ]}
-              >
-                Talhões
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.bottomTab, currentScreen === "planning" && styles.bottomTabActive]}
-              onPress={() => setCurrentScreen("planning")}
-              activeOpacity={0.7}
-            >
-              <Calendar
-                size={20}
-                color={currentScreen === "planning" ? "#10b981" : "#64748b"}
-              />
-              <Text
-                style={[
-                  styles.bottomTabText,
-                  currentScreen === "planning" && styles.bottomTabTextActive,
-                ]}
-              >
-                Planejamento
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.bottomTab}
-              onPress={() => setIsDrawerOpen(true)}
-              activeOpacity={0.7}
-            >
-              <Menu size={20} color="#64748b" />
-              <Text style={styles.bottomTabText}>Menu</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* MENU LATERAL RETRÁTIL (DRAWER ELEGANTE) */}
-        <Modal
-          visible={isDrawerOpen}
-          animationType="fade"
-          transparent={true}
-          onRequestClose={() => setIsDrawerOpen(false)}
-        >
-          <View style={styles.drawerOverlay}>
-            <TouchableOpacity
-              style={styles.drawerBackdrop}
-              activeOpacity={1}
-              onPress={() => setIsDrawerOpen(false)}
+      {/* CONTEÚDO PRINCIPAL (100% da Altura sem Barra Inferior) */}
+      <View style={styles.mainContainer}>
+        <View style={styles.screenContainer}>
+          {/* 1. Cockpit: Mapa de Gantt Operacional em Tela Cheia */}
+          {currentScreen === "cockpit" && (
+            <PlanningScreen
+              initialViewMode="GANTT"
+              onOpenSync={() => {
+                setPreviousScreen("cockpit");
+                setCurrentScreen("sync_queue");
+              }}
+              userRole={role}
             />
+          )}
 
-            <View style={styles.drawerSheet}>
-              {/* Header do Drawer */}
-              <View style={styles.drawerHeader}>
-                <View style={styles.drawerBrandGroup}>
-                  <View style={styles.drawerLogoBox}>
-                    <Leaf size={18} color="#10b981" strokeWidth={2.5} />
-                  </View>
-                  <View>
-                    <Text style={styles.drawerBrandTitle}>COCKPIT</Text>
-                    <Text style={styles.drawerBrandSubtitle}>FARROUPILHA</Text>
-                  </View>
+          {/* 2. Planejamento: Lista Detalhada de Planos e Cadastros */}
+          {currentScreen === "planning" && (
+            <PlanningScreen
+              initialViewMode="LISTA"
+              onOpenSync={() => {
+                setPreviousScreen("planning");
+                setCurrentScreen("sync_queue");
+              }}
+              userRole={role}
+            />
+          )}
+
+          {/* 3. Safras */}
+          {currentScreen === "seasons" && <SeasonsScreen />}
+
+          {/* 4. Fazendas */}
+          {currentScreen === "farms" && (
+            <FarmsScreen
+              onNavigateToFields={(farmId) => {
+                setTargetFarmIdForFields(farmId);
+                setCurrentScreen("fields");
+              }}
+            />
+          )}
+
+          {/* 5. Talhões */}
+          {currentScreen === "fields" && (
+            <FieldsScreen
+              onNavigateToFarms={() => setCurrentScreen("farms")}
+              initialFarmId={targetFarmIdForFields}
+            />
+          )}
+
+          {/* 6. Culturas */}
+          {currentScreen === "crops" && <CropsScreen />}
+
+          {/* 7. Sincronização Offline */}
+          {currentScreen === "sync_queue" && (
+            <SyncQueueScreen onBack={() => setCurrentScreen(previousScreen || "cockpit")} />
+          )}
+        </View>
+      </View>
+
+      {/* MENU LATERAL RETRÁTIL (DRAWER) — MENUS IGUAIS AO NAVEGADOR WEB */}
+      <Modal
+        visible={isDrawerOpen}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setIsDrawerOpen(false)}
+      >
+        <View style={styles.drawerOverlay}>
+          <TouchableOpacity
+            style={styles.drawerBackdrop}
+            activeOpacity={1}
+            onPress={() => setIsDrawerOpen(false)}
+          />
+
+          <View style={styles.drawerSheet}>
+            {/* Header do Drawer */}
+            <View style={styles.drawerHeader}>
+              <View style={styles.drawerBrandGroup}>
+                <View style={styles.drawerLogoBox}>
+                  <Leaf size={18} color="#10b981" strokeWidth={2.5} />
                 </View>
-
-                <TouchableOpacity
-                  style={styles.drawerCloseButton}
-                  onPress={() => setIsDrawerOpen(false)}
-                  activeOpacity={0.7}
-                >
-                  <X size={20} color="#94a3b8" />
-                </TouchableOpacity>
+                <View>
+                  <Text style={styles.drawerBrandTitle}>COCKPIT</Text>
+                  <Text style={styles.drawerBrandSubtitle}>DE PIVÔS</Text>
+                </View>
               </View>
 
-              {/* Card do Usuário */}
-              <View style={styles.drawerUserCard}>
-                <View style={styles.drawerUserAvatar}>
-                  <Text style={styles.drawerUserAvatarText}>
-                    {(currentUser?.first_name?.[0] || currentUser?.username?.[0] || "U").toUpperCase()}
-                  </Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.drawerUserName} numberOfLines={1}>
-                    {currentUser?.first_name
-                      ? `${currentUser.first_name} ${currentUser.last_name || ""}`
-                      : currentUser?.username || "Usuário"}
-                  </Text>
-                  <Text style={styles.drawerUserEmail} numberOfLines={1}>
-                    @{currentUser?.username || "usuario"}
-                  </Text>
-                  <View style={styles.drawerRoleTag}>
-                    <Text style={styles.drawerRoleTagText}>{roleDisplay}</Text>
-                  </View>
-                </View>
-              </View>
+              <TouchableOpacity
+                style={styles.drawerCloseButton}
+                onPress={() => setIsDrawerOpen(false)}
+                activeOpacity={0.7}
+              >
+                <X size={20} color="#94a3b8" />
+              </TouchableOpacity>
+            </View>
 
-              {/* Lista de Rotas / Menu */}
-              <ScrollView style={styles.drawerScroll} bounces={false}>
-                {/* Grupo 1: Gestão Agrícola */}
-                <Text style={styles.drawerSectionLabel}>GESTÃO AGRÍCOLA</Text>
-
-                <TouchableOpacity
-                  style={[
-                    styles.drawerItem,
-                    currentScreen === "pivots" && styles.drawerItemActive,
-                  ]}
-                  onPress={() => navigateTo("pivots")}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.drawerItemIcon, currentScreen === "pivots" && styles.drawerItemIconActive]}>
-                    <CircleGauge
-                      size={18}
-                      color={currentScreen === "pivots" ? "#10b981" : "#94a3b8"}
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.drawerItemText,
-                      currentScreen === "pivots" && styles.drawerItemTextActive,
-                    ]}
-                  >
-                    Cockpit (Pivôs)
-                  </Text>
-                  <ChevronRight size={16} color="#cbd5e1" />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.drawerItem,
-                    currentScreen === "farms" && styles.drawerItemActive,
-                  ]}
-                  onPress={() => navigateTo("farms")}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.drawerItemIcon, currentScreen === "farms" && styles.drawerItemIconActive]}>
-                    <Building2
-                      size={18}
-                      color={currentScreen === "farms" ? "#10b981" : "#94a3b8"}
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.drawerItemText,
-                      currentScreen === "farms" && styles.drawerItemTextActive,
-                    ]}
-                  >
-                    Cadastro de Fazendas
-                  </Text>
-                  <ChevronRight size={16} color="#cbd5e1" />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.drawerItem,
-                    currentScreen === "fields" && styles.drawerItemActive,
-                  ]}
-                  onPress={() => navigateTo("fields")}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.drawerItemIcon, currentScreen === "fields" && styles.drawerItemIconActive]}>
-                    <Grid3x3
-                      size={18}
-                      color={currentScreen === "fields" ? "#10b981" : "#94a3b8"}
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.drawerItemText,
-                      currentScreen === "fields" && styles.drawerItemTextActive,
-                    ]}
-                  >
-                    Cadastro de Talhões
-                  </Text>
-                  <ChevronRight size={16} color="#cbd5e1" />
-                </TouchableOpacity>
-
-                {/* Grupo 2: Operações & Planejamento */}
-                <Text style={styles.drawerSectionLabel}>OPERAÇÕES E CAMPO</Text>
-
-                <TouchableOpacity
-                  style={[
-                    styles.drawerItem,
-                    currentScreen === "planning" && styles.drawerItemActive,
-                  ]}
-                  onPress={() => navigateTo("planning")}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.drawerItemIcon, currentScreen === "planning" && styles.drawerItemIconActive]}>
-                    <Calendar
-                      size={18}
-                      color={currentScreen === "planning" ? "#10b981" : "#94a3b8"}
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.drawerItemText,
-                      currentScreen === "planning" && styles.drawerItemTextActive,
-                    ]}
-                  >
-                    Planejamento de Safras
-                  </Text>
-                  <ChevronRight size={16} color="#cbd5e1" />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.drawerItem,
-                    currentScreen === "opportunities" && styles.drawerItemActive,
-                  ]}
-                  onPress={() => navigateTo("opportunities")}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.drawerItemIcon, currentScreen === "opportunities" && styles.drawerItemIconActive]}>
-                    <Zap
-                      size={18}
-                      color={currentScreen === "opportunities" ? "#10b981" : "#94a3b8"}
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.drawerItemText,
-                      currentScreen === "opportunities" && styles.drawerItemTextActive,
-                    ]}
-                  >
-                    Janelas de Oportunidade
-                  </Text>
-                  <ChevronRight size={16} color="#cbd5e1" />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[
-                    styles.drawerItem,
-                    currentScreen === "sync_queue" && styles.drawerItemActive,
-                  ]}
-                  onPress={() => navigateTo("sync_queue")}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.drawerItemIcon, currentScreen === "sync_queue" && styles.drawerItemIconActive]}>
-                    <RefreshCw
-                      size={18}
-                      color={currentScreen === "sync_queue" ? "#10b981" : "#94a3b8"}
-                    />
-                  </View>
-                  <Text
-                    style={[
-                      styles.drawerItemText,
-                      currentScreen === "sync_queue" && styles.drawerItemTextActive,
-                    ]}
-                  >
-                    Sincronização Offline
-                  </Text>
-                  <ChevronRight size={16} color="#cbd5e1" />
-                </TouchableOpacity>
-              </ScrollView>
-
-              {/* Rodapé do Drawer com Logout */}
-              <View style={styles.drawerFooter}>
-                <TouchableOpacity
-                  style={styles.drawerLogoutBtn}
-                  onPress={handleLogout}
-                  activeOpacity={0.7}
-                >
-                  <LogOut size={18} color="#ef4444" />
-                  <Text style={styles.drawerLogoutText}>Sair da Conta</Text>
-                </TouchableOpacity>
-
-                <Text style={styles.drawerVersionText}>
-                  Cockpit de Pivôs Mobile · v1.0
+            {/* Card do Usuário */}
+            <View style={styles.drawerUserCard}>
+              <View style={styles.drawerUserAvatar}>
+                <Text style={styles.drawerUserAvatarText}>
+                  {(currentUser?.first_name?.[0] || currentUser?.username?.[0] || "U").toUpperCase()}
                 </Text>
               </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.drawerUserName} numberOfLines={1}>
+                  {currentUser?.first_name
+                    ? `${currentUser.first_name} ${currentUser.last_name || ""}`.trim()
+                    : currentUser?.username || "Usuário"}
+                </Text>
+                <View style={styles.drawerRoleTag}>
+                  <Text style={styles.drawerRoleTagText}>{roleDisplay}</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Lista de Rotas — Idêntica ao Navegador (Sidebar) */}
+            <ScrollView style={styles.drawerScroll} bounces={false}>
+              {/* GRUPO 1: GESTÃO AGRÍCOLA */}
+              <Text style={styles.drawerSectionLabel}>GESTÃO AGRÍCOLA</Text>
+
+              <TouchableOpacity
+                style={[
+                  styles.drawerItem,
+                  currentScreen === "cockpit" && styles.drawerItemActive,
+                ]}
+                onPress={() => navigateTo("cockpit")}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.drawerItemIcon, currentScreen === "cockpit" && styles.drawerItemIconActive]}>
+                  <CircleGauge
+                    size={18}
+                    color={currentScreen === "cockpit" ? "#10b981" : "#94a3b8"}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.drawerItemText,
+                    currentScreen === "cockpit" && styles.drawerItemTextActive,
+                  ]}
+                >
+                  Cockpit
+                </Text>
+                <ChevronRight size={16} color="#cbd5e1" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.drawerItem,
+                  currentScreen === "planning" && styles.drawerItemActive,
+                ]}
+                onPress={() => navigateTo("planning")}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.drawerItemIcon, currentScreen === "planning" && styles.drawerItemIconActive]}>
+                  <CalendarDays
+                    size={18}
+                    color={currentScreen === "planning" ? "#10b981" : "#94a3b8"}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.drawerItemText,
+                    currentScreen === "planning" && styles.drawerItemTextActive,
+                  ]}
+                >
+                  Planejamento
+                </Text>
+                <ChevronRight size={16} color="#cbd5e1" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.drawerItem,
+                  currentScreen === "seasons" && styles.drawerItemActive,
+                ]}
+                onPress={() => navigateTo("seasons")}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.drawerItemIcon, currentScreen === "seasons" && styles.drawerItemIconActive]}>
+                  <Calendar
+                    size={18}
+                    color={currentScreen === "seasons" ? "#10b981" : "#94a3b8"}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.drawerItemText,
+                    currentScreen === "seasons" && styles.drawerItemTextActive,
+                  ]}
+                >
+                  Safras
+                </Text>
+                <ChevronRight size={16} color="#cbd5e1" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.drawerItem,
+                  currentScreen === "farms" && styles.drawerItemActive,
+                ]}
+                onPress={() => navigateTo("farms")}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.drawerItemIcon, currentScreen === "farms" && styles.drawerItemIconActive]}>
+                  <Building2
+                    size={18}
+                    color={currentScreen === "farms" ? "#10b981" : "#94a3b8"}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.drawerItemText,
+                    currentScreen === "farms" && styles.drawerItemTextActive,
+                  ]}
+                >
+                  Fazendas
+                </Text>
+                <ChevronRight size={16} color="#cbd5e1" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.drawerItem,
+                  currentScreen === "fields" && styles.drawerItemActive,
+                ]}
+                onPress={() => navigateTo("fields")}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.drawerItemIcon, currentScreen === "fields" && styles.drawerItemIconActive]}>
+                  <Grid3x3
+                    size={18}
+                    color={currentScreen === "fields" ? "#10b981" : "#94a3b8"}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.drawerItemText,
+                    currentScreen === "fields" && styles.drawerItemTextActive,
+                  ]}
+                >
+                  Talhões
+                </Text>
+                <ChevronRight size={16} color="#cbd5e1" />
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.drawerItem,
+                  currentScreen === "crops" && styles.drawerItemActive,
+                ]}
+                onPress={() => navigateTo("crops")}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.drawerItemIcon, currentScreen === "crops" && styles.drawerItemIconActive]}>
+                  <Sprout
+                    size={18}
+                    color={currentScreen === "crops" ? "#10b981" : "#94a3b8"}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.drawerItemText,
+                    currentScreen === "crops" && styles.drawerItemTextActive,
+                  ]}
+                >
+                  Culturas
+                </Text>
+                <ChevronRight size={16} color="#cbd5e1" />
+              </TouchableOpacity>
+
+              {/* GRUPO 2: OPERAÇÕES */}
+              <Text style={styles.drawerSectionLabel}>OPERAÇÕES</Text>
+
+              <TouchableOpacity
+                style={[
+                  styles.drawerItem,
+                  currentScreen === "sync_queue" && styles.drawerItemActive,
+                ]}
+                onPress={() => navigateTo("sync_queue")}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.drawerItemIcon, currentScreen === "sync_queue" && styles.drawerItemIconActive]}>
+                  <RefreshCw
+                    size={18}
+                    color={currentScreen === "sync_queue" ? "#10b981" : "#94a3b8"}
+                  />
+                </View>
+                <Text
+                  style={[
+                    styles.drawerItemText,
+                    currentScreen === "sync_queue" && styles.drawerItemTextActive,
+                  ]}
+                >
+                  Sincronização Offline
+                </Text>
+                <ChevronRight size={16} color="#cbd5e1" />
+              </TouchableOpacity>
+
+              {/* GRUPO 3: SISTEMA */}
+              <Text style={styles.drawerSectionLabel}>SISTEMA</Text>
+
+              <TouchableOpacity
+                style={styles.drawerItem}
+                onPress={() => {
+                  setIsDrawerOpen(false);
+                  setIsSettingsOpen(true);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.drawerItemIcon}>
+                  <Settings size={18} color="#94a3b8" />
+                </View>
+                <Text style={styles.drawerItemText}>Configurações</Text>
+                <ChevronRight size={16} color="#cbd5e1" />
+              </TouchableOpacity>
+            </ScrollView>
+
+            {/* Rodapé do Drawer com Logout */}
+            <View style={styles.drawerFooter}>
+              <TouchableOpacity
+                style={styles.drawerLogoutBtn}
+                onPress={handleLogout}
+                activeOpacity={0.7}
+              >
+                <LogOut size={18} color="#ef4444" />
+                <Text style={styles.drawerLogoutText}>Sair da Conta</Text>
+              </TouchableOpacity>
+
+              <Text style={styles.drawerVersionText}>
+                Interface inicial · v0.1
+              </Text>
             </View>
           </View>
-        </Modal>
-      </SafeAreaView>
-    );
-  }
+        </View>
+      </Modal>
+
+      {/* MODAL DE CONFIGURAÇÕES DE REDE / API */}
+      <Modal
+        visible={isSettingsOpen}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsSettingsOpen(false)}
+      >
+        <View style={styles.settingsOverlay}>
+          <View style={styles.settingsSheet}>
+            <View style={styles.settingsHeader}>
+              <View style={styles.settingsHeaderIcon}>
+                <Settings size={20} color="#10b981" />
+              </View>
+              <Text style={styles.settingsTitle}>Configurações de Rede</Text>
+              <TouchableOpacity
+                onPress={() => setIsSettingsOpen(false)}
+                style={styles.settingsCloseBtn}
+              >
+                <X size={20} color="#64748b" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={{ padding: 16 }}>
+              <Text style={styles.settingsLabel}>Endereço da API Django:</Text>
+              <TextInput
+                style={styles.settingsInput}
+                value={customApiUrl}
+                onChangeText={setCustomApiUrl}
+                placeholder="http://192.168.0.15:8000/api/v1"
+                placeholderTextColor="#94a3b8"
+                autoCapitalize="none"
+              />
+
+              {settingsFeedback && (
+                <View style={styles.feedbackBanner}>
+                  <Text style={styles.feedbackText}>{settingsFeedback}</Text>
+                </View>
+              )}
+
+              <View style={styles.settingsActions}>
+                <TouchableOpacity
+                  style={[styles.testBtn, isTestingApi && { opacity: 0.6 }]}
+                  onPress={handleTestApiConnection}
+                  disabled={isTestingApi}
+                >
+                  {isTestingApi ? (
+                    <ActivityIndicator size="small" color="#334155" />
+                  ) : (
+                    <Text style={styles.testBtnText}>Testar Conexão</Text>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.saveBtn}
+                  onPress={handleSaveApiUrl}
+                >
+                  <Text style={styles.saveBtnText}>Salvar IP</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.settingsTipBox}>
+                <Server size={16} color="#64748b" />
+                <Text style={styles.settingsTipText}>
+                  Para uso em celular físico, configure o endereço IP da máquina na rede Wi-Fi local (ex: http://192.168.0.15:8000/api/v1).
+                </Text>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+}
 
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#0a1812",
+    backgroundColor: "#0d281e",
   },
   splashContainer: {
     flex: 1,
-    backgroundColor: "#0a1812",
+    backgroundColor: "#0d281e",
     justifyContent: "center",
     alignItems: "center",
   },
@@ -691,8 +698,8 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    backgroundColor: "#0d1f18",
+    paddingVertical: 12,
+    backgroundColor: "#0d281e",
     borderBottomWidth: 1,
     borderBottomColor: "#17382b",
   },
@@ -702,8 +709,8 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   menuButton: {
-    width: 38,
-    height: 38,
+    width: 40,
+    height: 40,
     borderRadius: 8,
     backgroundColor: "rgba(255, 255, 255, 0.08)",
     justifyContent: "center",
@@ -715,9 +722,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   brandIconBox: {
-    width: 30,
-    height: 30,
-    borderRadius: 7,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     backgroundColor: "rgba(16, 185, 129, 0.18)",
     justifyContent: "center",
     alignItems: "center",
@@ -733,7 +740,7 @@ const styles = StyleSheet.create({
     lineHeight: 15,
   },
   brandSubtitleText: {
-    color: "rgba(255, 255, 255, 0.6)",
+    color: "rgba(255, 255, 255, 0.65)",
     fontSize: 9,
     fontWeight: "700",
     letterSpacing: 1.2,
@@ -777,36 +784,6 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
   },
-  bottomBar: {
-    flexDirection: "row",
-    height: 62,
-    backgroundColor: "#ffffff",
-    borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
-    paddingBottom: 4,
-    paddingTop: 6,
-  },
-  bottomTab: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 3,
-  },
-  bottomTabActive: {
-    borderTopWidth: 2,
-    borderTopColor: "#10b981",
-    marginTop: -6,
-    paddingTop: 4,
-  },
-  bottomTabText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: "#64748b",
-  },
-  bottomTabTextActive: {
-    color: "#059669",
-    fontWeight: "700",
-  },
   drawerOverlay: {
     flex: 1,
     flexDirection: "row",
@@ -822,7 +799,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     width: width * 0.82,
     maxWidth: 320,
-    backgroundColor: "#0d1f18",
+    backgroundColor: "#0d281e",
     borderRightWidth: 1,
     borderRightColor: "#1a3a2e",
     flexDirection: "column",
@@ -915,7 +892,7 @@ const styles = StyleSheet.create({
   },
   drawerScroll: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 8,
   },
   drawerSectionLabel: {
     fontSize: 10,
@@ -923,7 +900,7 @@ const styles = StyleSheet.create({
     color: "#475569",
     letterSpacing: 1.2,
     paddingHorizontal: 20,
-    marginTop: 12,
+    marginTop: 14,
     marginBottom: 6,
   },
   drawerItem: {
@@ -987,9 +964,123 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: "center",
   },
+  settingsOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.5)",
+    justifyContent: "center",
+    padding: 20,
+  },
+  settingsSheet: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    overflow: "hidden",
+    maxHeight: "80%",
+  },
+  settingsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#e2e8f0",
+    gap: 10,
+  },
+  settingsHeaderIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  settingsTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "800",
+    color: "#0f172a",
+  },
+  settingsCloseBtn: {
+    padding: 4,
+  },
+  settingsLabel: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#475569",
+    marginBottom: 6,
+  },
+  settingsInput: {
+    height: 44,
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    fontSize: 13,
+    color: "#0f172a",
+    backgroundColor: "#f8fafc",
+  },
+  feedbackBanner: {
+    marginTop: 10,
+    padding: 10,
+    backgroundColor: "#f0fdf4",
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#bbf7d0",
+  },
+  feedbackText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#15803d",
+  },
+  settingsActions: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 14,
+  },
+  testBtn: {
+    flex: 1,
+    height: 40,
+    backgroundColor: "#f1f5f9",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+  },
+  testBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#334155",
+  },
+  saveBtn: {
+    flex: 1,
+    height: 40,
+    backgroundColor: "#10b981",
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  saveBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#ffffff",
+  },
+  settingsTipBox: {
+    flexDirection: "row",
+    gap: 8,
+    backgroundColor: "#f8fafc",
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 16,
+    alignItems: "center",
+  },
+  settingsTipText: {
+    flex: 1,
+    fontSize: 11,
+    color: "#64748b",
+    lineHeight: 16,
+  },
   errorContainer: {
     flex: 1,
-    backgroundColor: "#0a1812",
+    backgroundColor: "#0d281e",
     justifyContent: "center",
     alignItems: "center",
     padding: 24,
