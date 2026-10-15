@@ -114,6 +114,33 @@ export const mobileApi = {
     return data;
   },
 
+  loginAzure: async (payload: { access_token?: string; id_token?: string; code?: string; email?: string }) => {
+    let res: Response;
+    try {
+      res = await fetch(`${apiBaseUrl}/core/auth/azure/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch {
+      throw new Error(`Não foi possível conectar ao servidor em ${apiBaseUrl}. Verifique a rede ou Wi-Fi.`);
+    }
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      const message = err.detail || err.message || `Erro HTTP ${res.status}`;
+      throw new Error(message);
+    }
+
+    const data = await res.json();
+    mobileAuthToken = data.token;
+    await secureStorage.saveAuthToken(data.token);
+    if (data.user) {
+      await secureStorage.saveUserProfile(data.user);
+    }
+    return data;
+  },
+
   getMe: async () => {
     const res = await fetch(`${apiBaseUrl}/core/auth/me/`, {
       method: "GET",

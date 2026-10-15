@@ -39,6 +39,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { api, type Farm, type Field } from "@/services/api";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export const Route = createFileRoute("/talhoes")({
   head: () => ({
@@ -55,6 +56,7 @@ export const Route = createFileRoute("/talhoes")({
 });
 
 function TalhoesPage() {
+  const { canCreate, canEdit, canDelete } = usePermissions();
   const [fields, setFields] = useState<Field[]>([]);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -270,14 +272,16 @@ function TalhoesPage() {
             <span className="hidden sm:inline">Atualizar</span>
           </Button>
 
-          <Button
-            size="sm"
-            onClick={handleOpenCreate}
-            className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <Plus className="size-4" />
-            Novo Talhão
-          </Button>
+          {canCreate("talhoes") && (
+            <Button
+              size="sm"
+              onClick={handleOpenCreate}
+              className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              <Plus className="size-4" />
+              Novo Talhão
+            </Button>
+          )}
         </div>
       </div>
 
@@ -457,27 +461,31 @@ function TalhoesPage() {
                         {/* Coluna Ações */}
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenEdit(field)}
-                              className="h-8 px-2.5 text-xs cursor-pointer hover:bg-muted"
-                              title="Editar Talhão"
-                            >
-                              <Edit2 className="size-3.5 mr-1" />
-                              Editar
-                            </Button>
+                            {canEdit("talhoes") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenEdit(field)}
+                                className="h-8 px-2.5 text-xs cursor-pointer hover:bg-muted"
+                                title="Editar Talhão"
+                              >
+                                <Edit2 className="size-3.5 mr-1" />
+                                Editar
+                              </Button>
+                            )}
 
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setFieldToDelete(field)}
-                              className="h-8 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer"
-                              title="Excluir Talhão"
-                            >
-                              <Trash2 className="size-3.5 mr-1" />
-                              Excluir
-                            </Button>
+                            {canDelete("talhoes") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setFieldToDelete(field)}
+                                className="h-8 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer"
+                                title="Excluir Talhão"
+                              >
+                                <Trash2 className="size-3.5 mr-1" />
+                                Excluir
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

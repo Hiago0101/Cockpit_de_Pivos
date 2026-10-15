@@ -32,7 +32,10 @@ import {
   Building2,
 } from "lucide-react";
 
+import { usePermissions } from "@/hooks/usePermissions";
+
 export function PlanListView() {
+  const { canAccess, canViewFull, canCreate, canEdit, canDelete } = usePermissions();
   const [plans, setPlans] = useState<CropPlan[]>([]);
   const [totalCount, setTotalCount] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -181,14 +184,16 @@ export function PlanListView() {
             <span className="hidden sm:inline">Atualizar</span>
           </Button>
 
-          <Button
-            size="sm"
-            onClick={handleOpenCreate}
-            className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <Plus className="size-4" />
-            Novo Planejamento
-          </Button>
+          {canCreate("planejamento") && (
+            <Button
+              size="sm"
+              onClick={handleOpenCreate}
+              className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              <Plus className="size-4" />
+              Novo Planejamento
+            </Button>
+          )}
         </div>
       </div>
 
@@ -315,10 +320,12 @@ export function PlanListView() {
                 ? "Nenhum resultado corresponde aos filtros aplicados. Tente ajustar os termos."
                 : "Nenhum plano de cultivo registrado no sistema. Cadastre o primeiro planejamento de plantio."}
             </p>
-            <Button size="sm" onClick={handleOpenCreate} className="gap-1.5 text-xs font-semibold cursor-pointer">
-              <Plus className="size-3.5" />
-              Cadastrar Primeiro Planejamento
-            </Button>
+            {canCreate("planejamento") && (
+              <Button size="sm" onClick={handleOpenCreate} className="gap-1.5 text-xs font-semibold cursor-pointer">
+                <Plus className="size-3.5" />
+                Cadastrar Primeiro Planejamento
+              </Button>
+            )}
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -465,16 +472,18 @@ export function PlanListView() {
                           >
                             <Eye className="size-3.5" />
                           </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            title="Editar Planejamento"
-                            onClick={() => handleOpenEdit(p)}
-                            className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
-                          >
-                            <Edit className="size-3.5" />
-                          </Button>
-                          {p.status !== "CANCELADO" && (
+                          {canEdit("planejamento") && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              title="Editar Planejamento"
+                              onClick={() => handleOpenEdit(p)}
+                              className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                            >
+                              <Edit className="size-3.5" />
+                            </Button>
+                          )}
+                          {canDelete("planejamento") && p.status !== "CANCELADO" && (
                             <Button
                               variant="ghost"
                               size="sm"

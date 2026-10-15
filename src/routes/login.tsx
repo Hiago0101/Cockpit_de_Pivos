@@ -1,14 +1,12 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import {
-  Lock,
-  User,
-  Eye,
-  EyeOff,
   Loader2,
   AlertCircle,
   ArrowRight,
-  LockKeyhole,
+  Building2,
+  HelpCircle,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,10 +18,10 @@ import { api } from "@/services/api";
 export const Route = createFileRoute("/login")({
   head: () => ({
     meta: [
-      { title: "Login — Cockpit de Pivôs" },
-      { name: "description", content: "Acesso autenticado ao Cockpit de Pivôs." },
-      { property: "og:title", content: "Login — Cockpit de Pivôs" },
-      { property: "og:description", content: "Acesso autenticado ao Cockpit de Pivôs." },
+      { title: "Login Microsoft 365 — Cockpit de Pivôs" },
+      { name: "description", content: "Acesso corporativo exclusivo Microsoft 365 ao Cockpit de Pivôs." },
+      { property: "og:title", content: "Login Microsoft 365 — Cockpit de Pivôs" },
+      { property: "og:description", content: "Acesso corporativo exclusivo Microsoft 365 ao Cockpit de Pivôs." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -33,42 +31,124 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // Modo de teste homologado / fallback para desenvolvimento
+  const [showDevLogin, setShowDevLogin] = useState(false);
+  const [devEmail, setDevEmail] = useState("");
+
+  // Processa tokens retornados via Hash OAuth (se redirect direto do Microsoft 365)
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const hash = window.location.hash;
+    const search = window.location.search;
+
+    if (hash && hash.includes("access_token=")) {
+      const params = new URLSearchParams(hash.substring(1));
+      const accessToken = params.get("access_token");
+      if (accessToken) {
+        handleAzureLogin({ access_token: accessToken });
+      }
+    } else if (search && search.includes("code=")) {
+      const params = new URLSearchParams(search);
+      const code = params.get("code");
+      if (code) {
+        handleAzureLogin({ code });
+      }
+    }
+  }, []);
+
+  const handleAzureLogin = async (payload: { access_token?: string; id_token?: string; code?: string; email?: string }) => {
     setErrorMessage(null);
-
-    const cleanUsername = username.trim();
-    if (!cleanUsername) {
-      setErrorMessage("Por favor, informe seu usuário de acesso.");
-      return;
-    }
-    if (!password) {
-      setErrorMessage("Por favor, digite sua senha.");
-      return;
-    }
-
+    setErrorDetails(null);
     setIsLoading(true);
 
     try {
-      await api.login(cleanUsername, password);
+      await api.loginAzure(payload);
       if (typeof window !== "undefined") {
         localStorage.setItem("cockpit_authenticated", "true");
+        // Limpa hash da URL por segurança
+        window.history.replaceState(null, "", window.location.pathname);
       }
       navigate({ to: "/" });
     } catch (error: any) {
-      const message =
-        error?.message ||
-        "Não foi possível autenticar. Verifique seu usuário e senha.";
+      const message = error?.message || "Não foi possível validar seu acesso via Microsoft 365.";
       setErrorMessage(message);
+
+      if (message.includes("não possui pré-cadastro") || message.includes("USER_NOT_REGISTERED")) {
+        setErrorDetails(
+          "Por diretriz de segurança do Grupo Farroupilha, o auto-cadastro é bloqueado. Contate o Administrador de TI para solicitar a inclusão da sua conta."
+        );
+      } else if (message.includes("Active Directory") || message.includes("bloqueado")) {
+        setErrorDetails(
+          "Sua conta corporativa consta como inativa ou bloqueada no Microsoft Entra ID (Azure AD). Procure o suporte interno de TI."
+        );
+      }
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleStartMicrosoftLogin = async () => {
+    setErrorMessage(null);
+    setErrorDetails(null);
+
+    // Consulta configuração do Azure AD
+    try {
+      const azureConfig = await api.getAzureStatus().catch(() => null);
+      const clientId =
+        (import.meta.env as Record<string, string>)["VITE_AZURE_CLIENT_ID"] ||
+        azureConfig?.client_id;
+      const tenantId =
+        (import.meta.env as Record<string, string>)["VITE_AZURE_TENANT_ID"] ||
+        azureConfig?.tenant_id ||
+        "common";
+      const currentOriginRedirect =
+        typeof window !== "undefined" && window.location.origin
+          ? `${window.location.origin}/login`
+          : "";
+
+      const redirectUri =
+        currentOriginRedirect ||
+        (import.meta.env as Record<string, string>)["VITE_AZURE_REDIRECT_URI"] ||
+        "http://localhost:8080/login";
+
+      // Se temos App ID configurado no Azure, redireciona para login da Microsoft
+      if (clientId && clientId.length > 10 && !clientId.includes("...")) {
+        const authUrl =
+          `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?` +
+          new URLSearchParams({
+            client_id: clientId,
+            response_type: "token",
+            redirect_uri: redirectUri,
+            scope: "openid profile email User.Read",
+            response_mode: "fragment",
+            prompt: "select_account",
+          }).toString();
+
+        window.location.href = authUrl;
+        return;
+      }
+    } catch (e) {
+      console.warn("Falha ao checar status do Azure:", e);
+    }
+
+    // Se o app no Azure ainda não tem o CLIENT_ID preenchido no .env,
+    // abre o campo para digitar o e-mail corporativo para validação no backend
+    setShowDevLogin(true);
+  };
+
+  const handleDevSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const clean = devEmail.trim().toLowerCase();
+    if (!clean) {
+      setErrorMessage("Por favor, digite seu e-mail corporativo.");
+      return;
+    }
+    handleAzureLogin({ email: clean });
   };
 
   return (
@@ -105,150 +185,106 @@ function LoginPage() {
               Cockpit de Pivôs
             </h1>
             <p className="mt-4 hidden max-w-sm text-sm leading-relaxed text-sidebar-foreground/90 lg:block lg:text-base">
-              Uma visão integrada do campo, do planejamento à operação.
+              Uma visão integrada do campo, do planejamento à operação em tempo real.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Card do Formulário (Com curva arredondada de sobreposição no mobile) */}
+      {/* Card de Autenticação Microsoft 365 */}
       <section className="relative -mt-6 flex min-h-[calc(66svh+1.5rem)] min-w-0 flex-col rounded-t-3xl bg-background px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-8 shadow-2xl sm:px-12 lg:mt-0 lg:min-h-svh lg:rounded-none lg:shadow-none lg:py-10">
         <div className="mx-auto flex w-full max-w-sm flex-1 flex-col justify-start pb-8 pt-1 lg:justify-center lg:py-12">
           <span className="mb-6 hidden size-12 place-items-center rounded-md bg-accent text-primary lg:grid">
             <BrandIcon className="size-7" />
           </span>
           <p className="mb-2 hidden text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:block">
-            Cockpit de Pivôs
+            Cockpit de Pivôs — Grupo Farroupilha
           </p>
           <div className="mb-3 flex items-center gap-2 text-xs font-medium text-primary lg:hidden">
             <span className="h-px w-6 bg-primary" />
-            Acesso ao Sistema
+            Acesso Corporativo
           </div>
           <h2 className="text-2xl font-semibold leading-tight text-foreground sm:text-3xl">
-            Bem-vindo de volta
+            Acesso Microsoft 365
           </h2>
           <p className="mt-2 text-xs leading-relaxed text-muted-foreground sm:text-sm">
-            Acesse com seu usuário e senha corporativos.
+            Autenticação integrada com conta corporativa Microsoft Entra ID.
           </p>
 
-          {/* Alerta de Erro com Ícone Centralizado */}
+          {/* Alerta de Erro com Detalhamento de Bloqueio */}
           {errorMessage && (
-            <div className="mt-5 flex items-center gap-2.5 rounded-lg border border-destructive/30 bg-destructive/10 px-3.5 py-3 text-xs text-destructive">
-              <AlertCircle className="size-4 shrink-0" />
-              <span className="font-medium leading-normal break-words">
-                {errorMessage}
-              </span>
+            <div className="mt-5 space-y-1.5 rounded-lg border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive">
+              <div className="flex items-start gap-2.5">
+                <AlertCircle className="size-4 shrink-0 mt-0.5" />
+                <span className="font-semibold leading-normal break-words">
+                  {errorMessage}
+                </span>
+              </div>
+              {errorDetails && (
+                <p className="pl-6 text-[11px] text-destructive/80 leading-relaxed">
+                  {errorDetails}
+                </p>
+              )}
             </div>
           )}
 
-          {/* Formulário de Login */}
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4">
-            {/* Campo Usuário */}
-            <div className="space-y-1.5">
-              <Label htmlFor="login-username" className="text-xs font-medium text-foreground">
-                Usuário ou E-mail
-              </Label>
-              <div className="relative">
-                <User className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="login-username"
-                  type="text"
-                  required
-                  autoComplete="username"
-                  autoCapitalize="none"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  placeholder="Seu usuário de acesso"
-                  className="h-11 pl-10 text-sm bg-background"
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-
-            {/* Campo Senha */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="login-password" className="text-xs font-medium text-foreground">
-                  Senha
-                </Label>
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  id="login-password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Sua senha"
-                  className="h-11 pl-10 pr-10 text-sm bg-background font-mono"
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                  title={showPassword ? "Ocultar senha" : "Exibir senha"}
-                  tabIndex={-1}
-                >
-                  {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                </button>
-              </div>
-            </div>
-
-            {/* Botão de Entrar */}
+          {/* Botão Oficial Microsoft 365 */}
+          <div className="mt-8 space-y-4">
             <Button
-              type="submit"
+              type="button"
               disabled={isLoading}
-              className="mt-2 h-11 w-full justify-center gap-2 font-semibold text-sm cursor-pointer shadow-sm"
+              onClick={handleStartMicrosoftLogin}
+              className="h-13 w-full justify-center gap-3 border border-border bg-card text-foreground hover:bg-accent/80 hover:border-primary/50 text-sm font-semibold shadow-sm transition-all cursor-pointer"
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="size-4 animate-spin" />
-                  Autenticando...
+                  <Loader2 className="size-5 animate-spin text-primary" />
+                  <span>Validando conta corporativa...</span>
                 </>
               ) : (
                 <>
-                  Entrar no Cockpit
-                  <ArrowRight className="size-4" />
+                  <span className="microsoft-mark grid size-4 grid-cols-2 gap-0.5" aria-hidden="true">
+                    <span className="bg-[#f25022] rounded-[1px]" />
+                    <span className="bg-[#7fba00] rounded-[1px]" />
+                    <span className="bg-[#00a4ef] rounded-[1px]" />
+                    <span className="bg-[#ffb900] rounded-[1px]" />
+                  </span>
+                  <span>Entrar com Microsoft 365</span>
+                  <ArrowRight className="size-4 text-muted-foreground ml-auto" />
                 </>
               )}
             </Button>
-          </form>
-
-          {/* Divisor Corporativo */}
-          <div className="relative my-6 flex items-center justify-center text-xs text-muted-foreground">
-            <span className="absolute inset-x-0 h-px bg-border/70" />
-            <span className="relative bg-background px-2.5 uppercase tracking-wider text-[10px] font-medium text-muted-foreground">
-              ou acesso institucional
-            </span>
           </div>
 
-          {/* Botão Microsoft 365 (Fiel ao design original) */}
-          <Button
-            type="button"
-            variant="outline"
-            className="h-11 w-full justify-center gap-2.5 border-input hover:bg-accent text-xs font-medium cursor-pointer"
-            title="Autenticação integrada com conta corporativa Microsoft 365"
-            onClick={() => {
-              setErrorMessage("O Single Sign-On Microsoft 365 corporativo será ativado na homologação. Utilize seu usuário e senha acima.");
-            }}
-          >
-            <span className="microsoft-mark grid size-3.5 grid-cols-2 gap-0.5" aria-hidden="true">
-              <span />
-              <span />
-              <span />
-              <span />
-            </span>
-            <span>Entrar com Microsoft 365</span>
-          </Button>
-
-          {/* Informações de Segurança */}
-          <div className="mt-6 flex items-center justify-center gap-2 text-xs text-muted-foreground lg:justify-start">
-            <LockKeyhole className="size-3.5 text-primary" />
-            <span>Acesso seguro com permissões RBAC</span>
-          </div>
+          {/* Fallback Homologação / Dev para Simulação de E-mail 365 */}
+          {showDevLogin && (
+            <form onSubmit={handleDevSubmit} className="mt-6 space-y-3 rounded-lg border border-primary/20 bg-primary/5 p-4">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="dev-email" className="text-xs font-semibold text-primary">
+                  Validar E-mail Corporativo (AD 365)
+                </Label>
+                <span className="text-[10px] text-muted-foreground">Homologação</span>
+              </div>
+              <Input
+                id="dev-email"
+                type="email"
+                required
+                value={devEmail}
+                onChange={(e) => setDevEmail(e.target.value)}
+                placeholder="colaborador@grupofarroupilha.com"
+                className="h-10 text-xs bg-background"
+                disabled={isLoading}
+              />
+              <Button
+                type="submit"
+                disabled={isLoading}
+                className="w-full h-9 text-xs font-semibold gap-1.5 cursor-pointer"
+              >
+                {isLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                Confirmar Login com E-mail 365
+              </Button>
+            </form>
+          )}
         </div>
 
         {/* Rodapé */}

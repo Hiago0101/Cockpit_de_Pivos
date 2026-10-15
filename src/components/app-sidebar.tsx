@@ -39,26 +39,31 @@ function Brand() {
   );
 }
 
+import { usePermissions } from "@/hooks/usePermissions";
+
 export function AppSidebar() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
   const { setOpenMobile } = useSidebar();
+  const { canAccess } = usePermissions();
 
   const renderItems = (items: typeof primaryNavigation) =>
-    items.map((item) => (
-      <SidebarMenuItem key={item.path}>
-        <SidebarMenuButton
-          asChild
-          isActive={pathname === item.path}
-          tooltip={item.label}
-          className="h-8.5 gap-2.5 px-2.5 text-[13px] text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground"
-        >
-          <Link to={item.path} onClick={() => setOpenMobile(false)}>
-            <item.icon className="size-4 shrink-0" />
-            <span className="truncate">{item.label}</span>
-          </Link>
-        </SidebarMenuButton>
-      </SidebarMenuItem>
-    ));
+    items
+      .filter((item) => (item.modulo ? canAccess(item.modulo) : true))
+      .map((item) => (
+        <SidebarMenuItem key={item.path}>
+          <SidebarMenuButton
+            asChild
+            isActive={pathname === item.path}
+            tooltip={item.label}
+            className="h-8.5 gap-2.5 px-2.5 text-[13px] text-sidebar-foreground/75 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground"
+          >
+            <Link to={item.path} onClick={() => setOpenMobile(false)}>
+              <item.icon className="size-4 shrink-0" />
+              <span className="truncate">{item.label}</span>
+            </Link>
+          </SidebarMenuButton>
+        </SidebarMenuItem>
+      ));
 
   return (
     <Sidebar collapsible="icon" className="border-sidebar-border">

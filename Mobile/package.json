@@ -13,14 +13,18 @@
     "@react-native-community/netinfo": "12.0.1",
     "expo": "~57.0.28",
     "expo-asset": "~57.0.19",
+    "expo-auth-session": "~57.0.16",
+    "expo-clipboard": "~57.0.2",
     "expo-secure-store": "~57.0.4",
     "expo-sqlite": "~57.0.4",
     "expo-status-bar": "~57.0.1",
+    "expo-web-browser": "~57.0.3",
     "lucide-react-native": "^0.475.0",
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
-    "react-native-svg": "15.15.4"
+    "react-native-svg": "15.15.4",
+    "react-native-webview": "13.16.1"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

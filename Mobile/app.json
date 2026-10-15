@@ -9,17 +9,21 @@
     "splash": {
       "backgroundColor": "#132a22"
     },
+    "scheme": "cockpit",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.grupofarroupilha.cockpitpivos"
     },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#132a22"
-      }
+      },
+      "package": "com.grupofarroupilha.cockpitpivos"
     },
     "plugins": [
       "expo-asset",
-      "expo-sqlite"
+      "expo-sqlite",
+      "expo-web-browser"
     ]
   }
 }

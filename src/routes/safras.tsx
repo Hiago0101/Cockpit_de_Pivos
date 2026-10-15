@@ -40,6 +40,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { api, type Season, type Farm, type SeasonStatus } from "@/services/api";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export const Route = createFileRoute("/safras")({
   head: () => ({
@@ -56,6 +57,7 @@ export const Route = createFileRoute("/safras")({
 });
 
 function SafrasPage() {
+  const { canAccess, canViewFull, canCreate, canEdit, canDelete } = usePermissions();
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -285,14 +287,16 @@ function SafrasPage() {
             <span className="hidden sm:inline">Atualizar</span>
           </Button>
 
-          <Button
-            size="sm"
-            onClick={handleOpenCreate}
-            className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <Plus className="size-4" />
-            Nova Safra
-          </Button>
+          {canCreate("safras") && (
+            <Button
+              size="sm"
+              onClick={handleOpenCreate}
+              className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              <Plus className="size-4" />
+              Nova Safra
+            </Button>
+          )}
         </div>
       </div>
 
@@ -355,10 +359,12 @@ function SafrasPage() {
                   ? "Nenhum resultado corresponde aos filtros aplicados. Tente ajustar os termos."
                   : "Nenhuma safra agrícola cadastrada. Cadastre a primeira safra para habilitar o planejamento."}
               </p>
-              <Button size="sm" onClick={handleOpenCreate} className="gap-1.5 text-xs font-semibold cursor-pointer">
-                <Plus className="size-3.5" />
-                Cadastrar Primeira Safra
-              </Button>
+              {canCreate("safras") && (
+                <Button size="sm" onClick={handleOpenCreate} className="gap-1.5 text-xs font-semibold cursor-pointer">
+                  <Plus className="size-3.5" />
+                  Cadastrar Primeira Safra
+                </Button>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -451,27 +457,31 @@ function SafrasPage() {
                         {/* Coluna Ações */}
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenEdit(season)}
-                              className="h-8 px-2.5 text-xs cursor-pointer hover:bg-muted"
-                              title="Editar Safra"
-                            >
-                              <Edit2 className="size-3.5 mr-1" />
-                              Editar
-                            </Button>
+                            {canEdit("safras") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenEdit(season)}
+                                className="h-8 px-2.5 text-xs cursor-pointer hover:bg-muted"
+                                title="Editar Safra"
+                              >
+                                <Edit2 className="size-3.5 mr-1" />
+                                Editar
+                              </Button>
+                            )}
 
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setSeasonToDelete(season)}
-                              className="h-8 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer"
-                              title="Excluir Safra"
-                            >
-                              <Trash2 className="size-3.5 mr-1" />
-                              Excluir
-                            </Button>
+                            {canDelete("safras") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setSeasonToDelete(season)}
+                                className="h-8 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer"
+                                title="Excluir Safra"
+                              >
+                                <Trash2 className="size-3.5 mr-1" />
+                                Excluir
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

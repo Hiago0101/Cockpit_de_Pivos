@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { api, type Crop, type Farm } from "@/services/api";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export const Route = createFileRoute("/culturas")({
   head: () => ({
@@ -53,6 +54,7 @@ export const Route = createFileRoute("/culturas")({
 });
 
 function CulturasPage() {
+  const { canCreate, canEdit, canDelete } = usePermissions();
   const [crops, setCrops] = useState<Crop[]>([]);
   const [farms, setFarms] = useState<Farm[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -273,14 +275,16 @@ function CulturasPage() {
             <span className="hidden sm:inline">Atualizar</span>
           </Button>
 
-          <Button
-            size="sm"
-            onClick={handleOpenCreate}
-            className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <Plus className="size-4" />
-            Nova Cultura
-          </Button>
+          {canCreate("culturas") && (
+            <Button
+              size="sm"
+              onClick={handleOpenCreate}
+              className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              <Plus className="size-4" />
+              Nova Cultura
+            </Button>
+          )}
         </div>
       </div>
 
@@ -420,25 +424,29 @@ function CulturasPage() {
                         {/* Ações */}
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenEdit(crop)}
-                              className="h-8 px-2 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer gap-1"
-                            >
-                              <Edit2 className="size-3.5" />
-                              <span className="hidden sm:inline">Editar</span>
-                            </Button>
+                            {canEdit("culturas") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenEdit(crop)}
+                                className="h-8 px-2 text-xs font-semibold text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer gap-1"
+                              >
+                                <Edit2 className="size-3.5" />
+                                <span className="hidden sm:inline">Editar</span>
+                              </Button>
+                            )}
 
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setCropToDelete(crop)}
-                              className="h-8 px-2 text-xs font-semibold text-destructive/80 hover:text-destructive hover:bg-destructive/10 cursor-pointer gap-1"
-                            >
-                              <Trash2 className="size-3.5" />
-                              <span className="hidden sm:inline">Excluir</span>
-                            </Button>
+                            {canDelete("culturas") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => setCropToDelete(crop)}
+                                className="h-8 px-2 text-xs font-semibold text-destructive/80 hover:text-destructive hover:bg-destructive/10 cursor-pointer gap-1"
+                              >
+                                <Trash2 className="size-3.5" />
+                                <span className="hidden sm:inline">Excluir</span>
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

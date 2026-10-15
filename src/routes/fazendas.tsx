@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { api, type Farm, type Field } from "@/services/api";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export const Route = createFileRoute("/fazendas")({
   head: () => ({
@@ -53,6 +54,7 @@ export const Route = createFileRoute("/fazendas")({
 });
 
 function FazendasPage() {
+  const { canAccess, canViewFull, canCreate, canEdit, canDelete } = usePermissions();
   const [farms, setFarms] = useState<Farm[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
@@ -274,14 +276,16 @@ function FazendasPage() {
             <span className="hidden sm:inline">Atualizar</span>
           </Button>
 
-          <Button
-            size="sm"
-            onClick={handleOpenCreate}
-            className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
-          >
-            <Plus className="size-4" />
-            Nova Fazenda
-          </Button>
+          {canCreate("fazendas") && (
+            <Button
+              size="sm"
+              onClick={handleOpenCreate}
+              className="h-9 gap-1.5 text-xs font-semibold cursor-pointer shadow-xs bg-primary hover:bg-primary/90 text-primary-foreground"
+            >
+              <Plus className="size-4" />
+              Nova Fazenda
+            </Button>
+          )}
         </div>
       </div>
 
@@ -389,26 +393,30 @@ function FazendasPage() {
                         {/* Coluna Ações */}
                         <td className="px-6 py-4 text-right">
                           <div className="flex items-center justify-end gap-1.5">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenEdit(farm)}
-                              className="h-8 px-2.5 text-xs cursor-pointer hover:bg-muted"
-                              title="Editar Fazenda"
-                            >
-                              <Edit2 className="size-3.5 mr-1" />
-                              Editar
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleOpenDelete(farm)}
-                              className="h-8 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer"
-                              title="Excluir Fazenda"
-                            >
-                              <Trash2 className="size-3.5 mr-1" />
-                              Excluir
-                            </Button>
+                            {canEdit("fazendas") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenEdit(farm)}
+                                className="h-8 px-2.5 text-xs cursor-pointer hover:bg-muted"
+                                title="Editar Fazenda"
+                              >
+                                <Edit2 className="size-3.5 mr-1" />
+                                Editar
+                              </Button>
+                            )}
+                            {canDelete("fazendas") && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenDelete(farm)}
+                                className="h-8 px-2.5 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive cursor-pointer"
+                                title="Excluir Fazenda"
+                              >
+                                <Trash2 className="size-3.5 mr-1" />
+                                Excluir
+                              </Button>
+                            )}
                           </div>
                         </td>
                       </tr>

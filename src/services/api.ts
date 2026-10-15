@@ -3,7 +3,14 @@
  * Consome os endpoints versionados sob /api/v1/ do backend Django REST Framework.
  */
 
-const API_BASE_URL = (import.meta.env as Record<string, string>)["VITE_API_URL"] || "http://localhost:8000/api/v1";
+function resolveApiBaseUrl(): string {
+  if (typeof window !== "undefined") {
+    return "/api/v1";
+  }
+  return (import.meta.env as Record<string, string>)["VITE_API_URL"] || "http://localhost:8000/api/v1";
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 export interface Company {
   id: string;
@@ -431,12 +438,64 @@ export interface OpportunityWindow {
 
 export type UserRole = "ADMIN" | "GESTOR" | "OPERADOR" | "CONSULTOR";
 
+export interface ModuloPermissao {
+  pode_acessar_tela: boolean;
+  pode_visualizar_completo: boolean;
+  pode_incluir: boolean;
+  pode_alterar: boolean;
+  pode_excluir: boolean;
+}
+
+export interface GrupoPermissaoItem {
+  id?: string;
+  modulo: string;
+  modulo_display?: string;
+  pode_acessar_tela: boolean;
+  pode_visualizar_completo: boolean;
+  pode_incluir: boolean;
+  pode_alterar: boolean;
+  pode_excluir: boolean;
+}
+
+export interface GrupoPermissao {
+  id: string;
+  nome: string;
+  descricao: string;
+  is_admin_padrao: boolean;
+  ativo: boolean;
+  usuarios_count?: number;
+  permissoes?: GrupoPermissaoItem[];
+  criado_em?: string;
+  atualizado_em?: string;
+}
+
+export interface AzureUserInfo {
+  found: boolean;
+  configured?: boolean;
+  id?: string;
+  displayName?: string;
+  givenName?: string;
+  surname?: string;
+  mail?: string;
+  userPrincipalName?: string;
+  jobTitle?: string;
+  department?: string;
+  accountEnabled?: boolean;
+  mobilePhone?: string;
+  detail?: string;
+}
+
 export interface UserProfileData {
+  id?: string;
+  grupo?: GrupoPermissao | null;
   role: UserRole;
   role_display: string;
+  ad_oid?: string;
+  ad_upn?: string;
   empresa_nome: string;
   cargo: string;
   telefone: string;
+  departamento?: string;
   ativo: boolean;
   fazendas: string[];
 }
@@ -447,8 +506,12 @@ export interface UserData {
   email: string;
   first_name: string;
   last_name: string;
+  nome_completo?: string;
   is_active: boolean;
+  is_staff?: boolean;
+  is_superuser?: boolean;
   profile: UserProfileData;
+  permissoes?: Record<string, ModuloPermissao>;
 }
 
 export interface AuthResponse {
@@ -458,28 +521,34 @@ export interface AuthResponse {
 }
 
 export interface CreateUserData {
-  username: string;
   email: string;
-  password?: string;
-  first_name?: string;
+  first_name: string;
   last_name?: string;
-  role: UserRole;
-  cargo?: string;
-  telefone?: string;
-  empresa_nome?: string;
-  ativo?: boolean;
-  fazendas?: string[];
-}
-
-export interface UpdateUserData {
   username?: string;
-  email?: string;
   password?: string;
-  first_name?: string;
-  last_name?: string;
+  grupo_id?: string;
   role?: UserRole;
   cargo?: string;
   telefone?: string;
+  departamento?: string;
+  empresa_nome?: string;
+  ativo?: boolean;
+  fazendas?: string[];
+  ad_oid?: string;
+  ad_upn?: string;
+}
+
+export interface UpdateUserData {
+  email?: string;
+  first_name?: string;
+  last_name?: string;
+  username?: string;
+  password?: string;
+  grupo_id?: string;
+  role?: UserRole;
+  cargo?: string;
+  telefone?: string;
+  departamento?: string;
   empresa_nome?: string;
   ativo?: boolean;
   fazendas?: string[];
@@ -626,6 +695,61 @@ export const api = {
       method: "PATCH",
       body: JSON.stringify(data),
     });
+  },
+
+  // Microsoft 365 / Azure AD Auth
+  loginAzure: async (payload: { access_token?: string; id_token?: string; code?: string; redirect_uri?: string; email?: string }): Promise<AuthResponse> => {
+    const res = await request<AuthResponse>("/core/auth/azure/", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    setAuthToken(res.token);
+    setStoredUser(res.user);
+    return res;
+  },
+
+  lookupAzureUser: (email: string): Promise<AzureUserInfo> => {
+    return request<AzureUserInfo>(`/core/azure/lookup-user/?email=${encodeURIComponent(email)}`);
+  },
+
+  getAzureStatus: (): Promise<{ client_id: string; tenant_id: string; is_configured: boolean; has_client_secret: boolean; redirect_uri: string }> => {
+    return request<{ client_id: string; tenant_id: string; is_configured: boolean; has_client_secret: boolean; redirect_uri: string }>("/core/azure/status/");
+  },
+
+  // Grupo de Permissões (RBAC)
+  getGruposPermissao: async (): Promise<GrupoPermissao[]> => {
+    const res = await request<GrupoPermissao[] | { results: GrupoPermissao[] }>("/core/grupos-permissao/");
+    return Array.isArray(res) ? res : res.results;
+  },
+
+  createGrupoPermissao: (data: Partial<GrupoPermissao>): Promise<GrupoPermissao> => {
+    return request<GrupoPermissao>("/core/grupos-permissao/", {
+      method: "POST",
+      body: JSON.stringify(data),
+    });
+  },
+
+  updateGrupoPermissao: (id: string, data: Partial<GrupoPermissao>): Promise<GrupoPermissao> => {
+    return request<GrupoPermissao>(`/core/grupos-permissao/${id}/`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    });
+  },
+
+  deleteGrupoPermissao: (id: string): Promise<void> => {
+    return request<void>(`/core/grupos-permissao/${id}/`, {
+      method: "DELETE",
+    });
+  },
+
+  cloneGrupoPermissao: (id: string): Promise<GrupoPermissao> => {
+    return request<GrupoPermissao>(`/core/grupos-permissao/${id}/clonar/`, {
+      method: "POST",
+    });
+  },
+
+  getModulosDisponiveis: (): Promise<{ codigo: string; nome: string }[]> => {
+    return request<{ codigo: string; nome: string }[]>("/core/grupos-permissao/modulos_disponiveis/");
   },
 
   toggleUserActive: async (id: number): Promise<{ message: string; is_active: boolean; profile_ativo: boolean }> => {

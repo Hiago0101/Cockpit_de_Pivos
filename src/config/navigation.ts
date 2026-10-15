@@ -31,20 +31,21 @@ export type NavigationItem = {
   label: string;
   path: AppPath;
   icon: LucideIcon;
+  modulo?: string;
 };
 
 // Rotas ativas exibidas no painel esquerdo
 export const primaryNavigation: NavigationItem[] = [
-  { label: "Cockpit", path: "/", icon: CircleGauge },
-  { label: "Planejamento", path: "/planejamento", icon: CalendarDays },
-  { label: "Safras", path: "/safras", icon: Calendar },
-  { label: "Fazendas", path: "/fazendas", icon: Building2 },
-  { label: "Talhões", path: "/talhoes", icon: Grid3x3 },
-  { label: "Culturas", path: "/culturas", icon: Sprout },
+  { label: "Cockpit", path: "/", icon: CircleGauge, modulo: "cockpit" },
+  { label: "Planejamento", path: "/planejamento", icon: CalendarDays, modulo: "planejamento" },
+  { label: "Safras", path: "/safras", icon: Calendar, modulo: "safras" },
+  { label: "Fazendas", path: "/fazendas", icon: Building2, modulo: "fazendas" },
+  { label: "Talhões", path: "/talhoes", icon: Grid3x3, modulo: "talhoes" },
+  { label: "Culturas", path: "/culturas", icon: Sprout, modulo: "culturas" },
 ];
 
 export const secondaryNavigation: NavigationItem[] = [
-  { label: "Configurações", path: "/configuracoes", icon: Settings },
+  { label: "Usuários & Acessos", path: "/configuracoes", icon: Settings, modulo: "usuarios_grupos" },
 ];
 
 export const BrandIcon = Leaf;
